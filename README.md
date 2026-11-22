@@ -166,3 +166,87 @@ Una versión por fase de la hoja de ruta:
 | `v0.4.0` | Fase 4 — Reservas y pagos |
 | `v0.5.0` | Fase 5 — Valoraciones, chat y panel admin |
 | `v1.0.0` | Fase 6 — Entrega del TFG |
+
+
+
+
+# Diario de desarrollo — YouCare
+
+## 22/11/2026 — Guillermo Jiménez
+
+### Resumen
+Puesta en marcha de la base de datos local y primera entidad persistida (`Usuario`). La app ya arranca, conecta con PostgreSQL y Flyway crea las tablas automáticamente.
+
+### Qué he hecho
+
+**1. Refactor de `Usuario.java`**
+- Se mantiene la herencia `JOINED`: tabla `usuario` con los datos comunes y una tabla por subclase que comparte el `id`.
+- Código en español en todo el proyecto (entidades, columnas y JSON).
+- `contrasenia` → `hashContrasenia`: el campo guarda el hash BCrypt, nunca la contraseña en claro.
+- `imagenPerfilUrl` → `claveImagenPerfil`: se guarda la clave del archivo en R2, porque las URLs firmadas caducan.
+- Nuevo campo `apellidos`: permite mostrar "María G." y ordenar por apellido.
+- `length` en todas las columnas de texto, para que coincidan con los `VARCHAR` de la migración.
+
+**2. Docker Compose** (`docker-compose.yml`, en la raíz)
+- **PostgreSQL 17 + PostGIS** en el puerto **5433**. El 5432 choca con PostgreSQL si lo tienes instalado en Windows.
+- **Mailpit** para probar emails en local (`http://localhost:8025`).
+
+**3. Configuración de Spring** (`backend/src/main/resources/`)
+- `application.properties`: lo común a todos los perfiles, con `dev` como perfil por defecto.
+- `application-dev.properties`: conexión a la BD local, `ddl-auto=validate` y Mailpit.
+- Con `validate`, Hibernate no crea tablas: solo comprueba que la entidad coincide con la tabla. El esquema lo gestiona Flyway.
+
+**4. Migraciones Flyway** (`backend/src/main/resources/db/migration/`)
+- `V1__extensions.sql`: activa `postgis` (búsqueda por distancia) y `btree_gist` (evitar reservas solapadas).
+- `V2__crear_usuario.sql`: tabla `usuario` con email único y `CHECK` de los roles válidos.
+- **Regla:** una migración que ya se ha ejecutado no se edita. Los cambios van en `V3`, `V4`…
+
+**5. `.gitignore`**
+- Se ignoran los secretos (`.env`, `application-local.properties`), los logs y los archivos del sistema operativo.
+- `docker-compose.yml` y `application-dev.properties` sí se suben: solo llevan credenciales locales.
+
+### Problemas resueltos
+| Error | Causa | Solución |
+|---|---|---|
+| `no configuration file provided` | `docker compose` lanzado desde `backend/` | Ejecutarlo desde la raíz del repo |
+| `'url' attribute is not specified` | Faltaba la conexión en `application-dev.properties` | Añadir `spring.datasource.*` |
+| `la autentificación password falló` | Respondía el PostgreSQL de Windows, no el contenedor | Cambiar el contenedor al puerto 5433 |
+
+### Cómo comprobar que funciona
+
+**Requisito:** Docker Desktop abierto, con *Engine running*.
+
+**1. Levantar la BD** (desde la raíz del repo)
+    docker compose up -d
+    docker compose ps
+✅ `youcare-db` aparece como `healthy`.
+
+**2. Compilar** (desde `backend/`)
+    ./mvnw compile
+✅ `BUILD SUCCESS`.
+
+**3. Arrancar la app** (desde `backend/`)
+    ./mvnw spring-boot:run
+✅ En el log aparecen:
+- `Successfully applied N migrations`
+- `Started BackendApplication`
+
+❌ Si sale `APPLICATION FAILED TO START`, el motivo está en la sección `Description`.
+
+**4. Ver la tabla** (otra terminal, desde la raíz)
+    docker compose exec db psql -U youcare -d youcare -c "\d usuario"
+✅ Aparecen las 11 columnas y las restricciones `uk_usuario_email` y `ck_usuario_rol`.
+
+**5. Empezar con la BD vacía** (si una migración falla o queréis datos limpios)
+    docker compose down -v
+    docker compose up -d
+⚠️ Borra todos los datos locales.
+
+### Commits
+- `refactor(backend): ajustar Usuario al modelo de datos`
+- `chore: añadir docker-compose con PostGIS y Mailpit`
+- `chore(backend): configurar perfiles y conexión a la BD local`
+- `feat(backend): añadir migraciones de extensiones y usuario`
+
+### Siguiente paso
+Subclases `Admin` y `Cliente` con su migración `V3`.
