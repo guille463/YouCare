@@ -3,7 +3,6 @@ package com.youcare.backend.entity.enums;
 /**
  * Roles posibles de un usuario en la plataforma YouCare.
  *
- * @author Jorge Martín Llaneli
  */
 public enum Rol {
     /** Persona (o familiar) que contrata servicios de cuidados. */
