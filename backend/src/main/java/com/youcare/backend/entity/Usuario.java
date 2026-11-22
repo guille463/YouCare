@@ -9,8 +9,9 @@ import com.youcare.backend.entity.enums.Rol;
  * Entidad base de todos los usuarios de la plataforma YouCare.
  * <p>
  * Agrupa los datos comunes a clientes, cuidadores, administradores y empresas,
- * incluida la imagen de perfil. Usa herencia {@code JOINED}: cada subclase
- * tiene su propia tabla, que comparte clave primaria con {@code usuario}.
+ * incluida la imagen de perfil y la ubicación usada en la búsqueda por radio.
+ * Usa herencia {@code JOINED}: cada subclase tiene su propia tabla, que
+ * comparte clave primaria con {@code usuario}.
  * </p>
  *
  * @author Jorge Martín Llaneli
@@ -34,7 +35,7 @@ public abstract class Usuario {
     private String contrasenia;
 
     /** Nombre completo del usuario o razón social si es una empresa. */
-    @Column(nullable = false)
+    @Column(nullable = false, unique = true)
     private String nombre;
 
     /** Teléfono de contacto. */
@@ -43,6 +44,18 @@ public abstract class Usuario {
     /** URL de la imagen de perfil, común a todos los tipos de usuario. */
     @Column(name = "imagen_perfil_url")
     private String imagenPerfilUrl;
+
+    /**
+     * Latitud de la ubicación en grados (WGS84), o {@code null} si no la ha
+     * indicado.
+     */
+    private Double latitud;
+
+    /**
+     * Longitud de la ubicación en grados (WGS84), o {@code null} si no la ha
+     * indicado.
+     */
+    private Double longitud;
 
     /** Rol del usuario en la plataforma. */
     @Enumerated(EnumType.STRING)
@@ -89,10 +102,7 @@ public abstract class Usuario {
 
     // ============= MÉTODOS =============
 
-    /**
-     * Asigna la fecha de registro justo antes de guardar por primera vez. (eso
-     * hace @PrePersist)
-     */
+    /** Asigna la fecha de registro justo antes de guardar por primera vez. */
     @PrePersist
     void alCrear() {
         this.fechaRegistro = Instant.now();
@@ -155,6 +165,26 @@ public abstract class Usuario {
     /** @param imagenPerfilUrl URL de la imagen de perfil */
     public void setImagenPerfilUrl(String imagenPerfilUrl) {
         this.imagenPerfilUrl = imagenPerfilUrl;
+    }
+
+    /** @return latitud en grados, o {@code null} si no tiene ubicación */
+    public Double getLatitud() {
+        return latitud;
+    }
+
+    /** @param latitud latitud en grados, entre -90 y 90 */
+    public void setLatitud(Double latitud) {
+        this.latitud = latitud;
+    }
+
+    /** @return longitud en grados, o {@code null} si no tiene ubicación */
+    public Double getLongitud() {
+        return longitud;
+    }
+
+    /** @param longitud longitud en grados, entre -180 y 180 */
+    public void setLongitud(Double longitud) {
+        this.longitud = longitud;
     }
 
     /** @return rol del usuario */
