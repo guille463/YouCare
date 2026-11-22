@@ -1,19 +1,29 @@
 package com.youcare.backend.entity;
 
-import jakarta.persistence.*;
 import java.time.Instant;
 
 import com.youcare.backend.entity.enums.Rol;
 
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Inheritance;
+import jakarta.persistence.InheritanceType;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.Table;
+
 /**
  * Entidad base de todos los usuarios de la plataforma YouCare.
  * <p>
- * Agrupa los datos comunes a clientes, cuidadores, administradores y empresas,
- * incluida la imagen de perfil. Usa herencia {@code JOINED}: cada subclase
- * tiene su propia tabla, que comparte clave primaria con {@code usuario}.
+ * Agrupa los datos comunes a clientes, cuidadores, administradores y empresas.
+ * Usa herencia {@code JOINED}: cada subclase tiene su propia tabla, que comparte
+ * clave primaria con {@code usuario}.
  * </p>
  *
- * @author Jorge Martín Llaneli
  */
 @Entity
 @Table(name = "usuario")
@@ -26,30 +36,38 @@ public abstract class Usuario {
     private Long id;
 
     /** Correo electrónico, único y usado para iniciar sesión. */
-    @Column(nullable = false, unique = true)
+    @Column(nullable = false, unique = true, length = 255)
     private String email;
 
-    /** Hash BCrypt de la contraseña. La contraseña real nunca se almacena. */
-    @Column(name = "contrasenia", nullable = false)
-    private String contrasenia;
+    /** Hash BCrypt de la contraseña. La contraseña en claro nunca se almacena. */
+    @Column(name = "hash_contrasenia", nullable = false, length = 100)
+    private String hashContrasenia;
 
-    /** Nombre completo del usuario o razón social si es una empresa. */
-    @Column(nullable = false)
+    /** Nombre de pila del usuario (en una empresa, de la persona de contacto). */
+    @Column(nullable = false, length = 100)
     private String nombre;
 
+    /** Apellidos del usuario (en una empresa, de la persona de contacto). */
+    @Column(nullable = false, length = 150)
+    private String apellidos;
+
     /** Teléfono de contacto. */
+    @Column(length = 20)
     private String telefono;
 
-    /** URL de la imagen de perfil, común a todos los tipos de usuario. */
-    @Column(name = "imagen_perfil_url")
-    private String imagenPerfilUrl;
+    /**
+     * Clave del objeto de la imagen de perfil en el almacenamiento (R2).
+     * No es una URL: la URL firmada la genera {@code StorageService} en cada petición.
+     */
+    @Column(name = "clave_imagen_perfil", length = 255)
+    private String claveImagenPerfil;
 
-    /** Rol del usuario en la plataforma. */
+    /** Rol del usuario en la plataforma, fijado por cada subclase. */
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(nullable = false, length = 20)
     private Rol rol;
 
-    /** Indica si la cuenta está activa. Una cuenta inactiva no puede acceder. */
+    /** Indica si la cuenta está activa. Una cuenta bloqueada no puede acceder. */
     @Column(nullable = false)
     private boolean activo = true;
 
@@ -57,17 +75,13 @@ public abstract class Usuario {
     @Column(name = "email_verificado", nullable = false)
     private boolean emailVerificado = false;
 
-    /**
-     * Fecha y hora de registro (UTC), asignada automáticamente al crear la cuenta.
-     */
+    /** Fecha y hora de registro (UTC), asignada automáticamente al crear la cuenta. */
     @Column(name = "fecha_registro", nullable = false, updatable = false)
     private Instant fechaRegistro;
 
     // ========== CONSTRUCTORES ===========
 
-    /**
-     * Constructor sin argumentos requerido por JPA. No debe usarse directamente.
-     */
+    /** Constructor sin argumentos requerido por JPA. No debe usarse directamente. */
     protected Usuario() {
     }
 
@@ -75,24 +89,23 @@ public abstract class Usuario {
      * Crea un usuario con los datos obligatorios. Los demás campos se asignan
      * con sus setters o toman su valor por defecto.
      *
-     * @param email       correo electrónico, único en la plataforma
-     * @param contrasenia hash BCrypt de la contraseña, nunca la contraseña en claro
-     * @param nombre      nombre completo o razón social si es una empresa
-     * @param rol         rol del usuario, fijado por cada subclase
+     * @param email           correo electrónico, único en la plataforma
+     * @param hashContrasenia hash BCrypt de la contraseña, nunca la contraseña en claro
+     * @param nombre          nombre de pila
+     * @param apellidos       apellidos
+     * @param rol             rol del usuario, fijado por cada subclase
      */
-    protected Usuario(String email, String contrasenia, String nombre, Rol rol) {
+    protected Usuario(String email, String hashContrasenia, String nombre, String apellidos, Rol rol) {
         this.email = email;
-        this.contrasenia = contrasenia;
+        this.hashContrasenia = hashContrasenia;
         this.nombre = nombre;
+        this.apellidos = apellidos;
         this.rol = rol;
     }
 
     // ============= MÉTODOS =============
 
-    /**
-     * Asigna la fecha de registro justo antes de guardar por primera vez. (eso
-     * hace @PrePersist)
-     */
+    /** Asigna la fecha de registro justo antes de guardar por primera vez. */
     @PrePersist
     void alCrear() {
         this.fechaRegistro = Instant.now();
@@ -113,28 +126,34 @@ public abstract class Usuario {
         this.email = email;
     }
 
-    /** @return hash de la contraseña */
-    public String getContrasenia() {
-        return contrasenia;
+    /** @return hash BCrypt de la contraseña */
+    public String getHashContrasenia() {
+        return hashContrasenia;
     }
 
-    /**
-     * @param contrasenia hash BCrypt de la contraseña, nunca la contraseña en claro
-     */
-    public void setContrasenia(String contrasenia) {
-        this.contrasenia = contrasenia;
+    /** @param hashContrasenia hash BCrypt, nunca la contraseña en claro */
+    public void setHashContrasenia(String hashContrasenia) {
+        this.hashContrasenia = hashContrasenia;
     }
 
-    /** @return nombre completo o razón social */
+    /** @return nombre de pila */
     public String getNombre() {
         return nombre;
     }
 
-    /**
-     * @param nombre nombre completo del usuario o razón social si es una empresa
-     */
+    /** @param nombre nombre de pila */
     public void setNombre(String nombre) {
         this.nombre = nombre;
+    }
+
+    /** @return apellidos */
+    public String getApellidos() {
+        return apellidos;
+    }
+
+    /** @param apellidos apellidos */
+    public void setApellidos(String apellidos) {
+        this.apellidos = apellidos;
     }
 
     /** @return teléfono de contacto, o {@code null} si no lo ha indicado */
@@ -147,14 +166,14 @@ public abstract class Usuario {
         this.telefono = telefono;
     }
 
-    /** @return URL de la imagen de perfil, o {@code null} si no tiene */
-    public String getImagenPerfilUrl() {
-        return imagenPerfilUrl;
+    /** @return clave de la imagen de perfil en el almacenamiento, o {@code null} si no tiene */
+    public String getClaveImagenPerfil() {
+        return claveImagenPerfil;
     }
 
-    /** @param imagenPerfilUrl URL de la imagen de perfil */
-    public void setImagenPerfilUrl(String imagenPerfilUrl) {
-        this.imagenPerfilUrl = imagenPerfilUrl;
+    /** @param claveImagenPerfil clave del objeto en el almacenamiento */
+    public void setClaveImagenPerfil(String claveImagenPerfil) {
+        this.claveImagenPerfil = claveImagenPerfil;
     }
 
     /** @return rol del usuario */
@@ -167,10 +186,7 @@ public abstract class Usuario {
         return activo;
     }
 
-    /**
-     * @param activo {@code true} para activar la cuenta, {@code false} para
-     *               desactivarla
-     */
+    /** @param activo {@code true} para activar la cuenta, {@code false} para bloquearla */
     public void setActivo(boolean activo) {
         this.activo = activo;
     }
