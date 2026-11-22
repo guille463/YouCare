@@ -1,7 +1,8 @@
 # YouCare
-Proyecto fin de grado 2ª DAM
-# YouCare — Marketplace de cuidado de personas mayores
 
+Proyecto fin de grado 2ª DAM
+
+# YouCare — Marketplace de cuidado de personas mayores
 
 ## Descripción
 
@@ -111,27 +112,27 @@ develop ──●────●────●────●──────
          feature/... (una por tarea)
 ```
 
-| Rama | Sale de | Se fusiona en | Para qué se usa |
-|---|---|---|---|
-| `main` | — | — | Código en producción. Cada merge despliega automáticamente (Render, Netlify). **Nunca se trabaja directamente aquí** |
-| `develop` | `main` | — | Integración. Aquí se juntan todas las funcionalidades terminadas. Siempre tiene que compilar y arrancar |
-| `feature/<area>-<descripcion>` | `develop` | `develop` | Una rama por tarea de Trello. Se borra al fusionarla |
-| `release/v<versión>` | `develop` | `main` y `develop` | Se crea al cerrar cada fase: últimos ajustes, versión y etiqueta |
-| `hotfix/<descripcion>` | `main` | `main` y `develop` | Corrección urgente de un error en producción |
+| Rama                           | Sale de   | Se fusiona en      | Para qué se usa                                                                                                      |
+| ------------------------------ | --------- | ------------------ | -------------------------------------------------------------------------------------------------------------------- |
+| `main`                         | —         | —                  | Código en producción. Cada merge despliega automáticamente (Render, Netlify). **Nunca se trabaja directamente aquí** |
+| `develop`                      | `main`    | —                  | Integración. Aquí se juntan todas las funcionalidades terminadas. Siempre tiene que compilar y arrancar              |
+| `feature/<area>-<descripcion>` | `develop` | `develop`          | Una rama por tarea de Trello. Se borra al fusionarla                                                                 |
+| `release/v<versión>`           | `develop` | `main` y `develop` | Se crea al cerrar cada fase: últimos ajustes, versión y etiqueta                                                     |
+| `hotfix/<descripcion>`         | `main`    | `main` y `develop` | Corrección urgente de un error en producción                                                                         |
 
 ### Nombres de las ramas `feature`
 
 El prefijo indica la parte del proyecto:
 
-| Área | Ejemplo |
-|---|---|
-| `backend` | `feature/backend-auth-jwt` |
-| `mobile` | `feature/mobile-search-screen` |
-| `admin` | `feature/admin-caregiver-verification` |
-| `web` | `feature/web-legal-pages` |
-| `db` | `feature/db-init-schema` |
-| `infra` | `feature/infra-docker-render` |
-| `docs` | `feature/docs-domain-model` |
+| Área      | Ejemplo                                |
+| --------- | -------------------------------------- |
+| `backend` | `feature/backend-auth-jwt`             |
+| `mobile`  | `feature/mobile-search-screen`         |
+| `admin`   | `feature/admin-caregiver-verification` |
+| `web`     | `feature/web-legal-pages`              |
+| `db`      | `feature/db-init-schema`               |
+| `infra`   | `feature/infra-docker-render`          |
+| `docs`    | `feature/docs-domain-model`            |
 
 ### Normas
 
@@ -145,24 +146,30 @@ El prefijo indica la parte del proyecto:
 
 Formato [Conventional Commits](https://www.conventionalcommits.org/es/):
 
-| Prefijo | Uso | Ejemplo |
-|---|---|---|
-| `feat:` | Nueva funcionalidad | `feat: registro de cuidadores con verificación de email` |
-| `fix:` | Corrección de error | `fix: solape de reservas en el mismo horario` |
-| `docs:` | Documentación | `docs: actualizar modelo de dominio` |
-| `refactor:` | Cambio de código sin cambiar comportamiento | `refactor: extraer mapper de Booking` |
-| `test:` | Tests | `test: casos de cancelación con reembolso` |
-| `chore:` | Configuración, dependencias | `chore: añadir Flyway al backend` |
+| Prefijo     | Uso                                         | Ejemplo                                                  |
+| ----------- | ------------------------------------------- | -------------------------------------------------------- |
+| `feat:`     | Nueva funcionalidad                         | `feat: registro de cuidadores con verificación de email` |
+| `fix:`      | Corrección de error                         | `fix: solape de reservas en el mismo horario`            |
+| `docs:`     | Documentación                               | `docs: actualizar modelo de dominio`                     |
+| `refactor:` | Cambio de código sin cambiar comportamiento | `refactor: extraer mapper de Booking`                    |
+| `test:`     | Tests                                       | `test: casos de cancelación con reembolso`               |
+| `chore:`    | Configuración, dependencias                 | `chore: añadir Flyway al backend`                        |
 
 ### Versiones
 
 Una versión por fase de la hoja de ruta:
 
-| Versión | Fase |
-|---|---|
-| `v0.1.0` | Fase 1 — Análisis y diseño |
-| `v0.2.0` | Fase 2 — Autenticación y usuarios |
-| `v0.3.0` | Fase 3 — Búsqueda y geolocalización |
-| `v0.4.0` | Fase 4 — Reservas y pagos |
+| Versión  | Fase                                      |
+| -------- | ----------------------------------------- |
+| `v0.1.0` | Fase 1 — Análisis y diseño                |
+| `v0.2.0` | Fase 2 — Autenticación y usuarios         |
+| `v0.3.0` | Fase 3 — Búsqueda y geolocalización       |
+| `v0.4.0` | Fase 4 — Reservas y pagos                 |
 | `v0.5.0` | Fase 5 — Valoraciones, chat y panel admin |
-| `v1.0.0` | Fase 6 — Entrega del TFG |
+| `v1.0.0` | Fase 6 — Entrega del TFG                  |
+
+## DIARIO
+
+### 22/11/2026
+
+- Se crearon las clases Usuario, Cliente, Config y EdadMinimaException: En usuario se agrego latitud y longitud. En Cliente se extendió a usuario y se verifico la edad al crear el cliente. Config mantiene las constantes de la app. EdadMinimaException es un tipo de exception usado para la edad mínima.
