@@ -4,6 +4,7 @@ import java.time.Instant;
 
 import com.youcare.backend.config.Config;
 import com.youcare.backend.entity.enums.Rol;
+import com.youcare.backend.util.EmailUtil;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -111,7 +112,7 @@ public abstract class Usuario {
      * @param rol             rol del usuario, fijado por cada subclase
      */
     protected Usuario(String email, String hashContrasenia, String nombre, String apellidos, Rol rol, String telefono) {
-        this.email = email;
+        this.email = EmailUtil.normalizar(email);
         this.hashContrasenia = hashContrasenia;
         this.nombre = nombre;
         this.apellidos = apellidos;
@@ -134,7 +135,7 @@ public abstract class Usuario {
 
     /** @param email correo electrónico, único en la plataforma */
     public void setEmail(String email) {
-        this.email = email;
+        this.email = EmailUtil.normalizar(email);
     }
 
     /** @return hash BCrypt de la contraseña */
