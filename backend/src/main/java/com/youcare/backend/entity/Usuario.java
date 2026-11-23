@@ -46,7 +46,7 @@ public abstract class Usuario {
     private String hashContrasenia;
 
     /** Nombre completo del usuario o razón social si es una empresa. */
-    @Column(nullable = false, length= Config.MAX_LONGITUD_NOMBRE)
+    @Column(nullable = false, length = Config.MAX_LONGITUD_NOMBRE)
     private String nombre;
 
     /** Apellidos del usuario (en una empresa, de la persona de contacto). */
@@ -54,12 +54,13 @@ public abstract class Usuario {
     private String apellidos;
 
     /** Teléfono de contacto. */
-    @Column(length = Config.MAX_LONGITUD_TELEFONO, nullable = false, unique = true)
+    @Column(length = Config.MAX_LONGITUD_TELEFONO, nullable = false)
     private String telefono;
 
     /**
      * Clave del objeto de la imagen de perfil en el almacenamiento (R2).
-     * No es una URL: la URL firmada la genera {@code StorageService} en cada petición.
+     * No es una URL: la URL firmada la genera {@code StorageService} en cada
+     * petición.
      */
     @Column(name = "clave_imagen_perfil", length = Config.MAX_LONGITUD_CLAVE_IMG)
     private String claveImagenPerfil;
@@ -77,17 +78,24 @@ public abstract class Usuario {
     @Column(name = "email_verificado", nullable = false)
     private boolean emailVerificado = false;
 
-    /** Fecha y hora de registro (UTC), asignada automáticamente al crear la cuenta. */
+    /**
+     * Fecha y hora de registro (UTC), asignada automáticamente al crear la cuenta.
+     */
     @Column(name = "fecha_registro", nullable = false, updatable = false)
     private Instant fechaRegistro;
 
-    /** Cantidad de advertencias que tiene la cuenta. Si alcanza la cantidad de {@link Config#MAX_STRIKES} la cuenta queda inactiva */
+    /**
+     * Cantidad de advertencias que tiene la cuenta. Si alcanza la cantidad de
+     * {@link Config#MAX_STRIKES} la cuenta queda inactiva
+     */
     @Column(name = "cantidad_strikes", nullable = false)
     private int strikes;
 
     // ========== CONSTRUCTORES ===========
 
-    /** Constructor sin argumentos requerido por JPA. No debe usarse directamente. */
+    /**
+     * Constructor sin argumentos requerido por JPA. No debe usarse directamente.
+     */
     protected Usuario() {
     }
 
@@ -96,7 +104,8 @@ public abstract class Usuario {
      * con sus setters o toman su valor por defecto.
      *
      * @param email           correo electrónico, único en la plataforma
-     * @param hashContrasenia hash BCrypt de la contraseña, nunca la contraseña en claro
+     * @param hashContrasenia hash BCrypt de la contraseña, nunca la contraseña en
+     *                        claro
      * @param nombre          nombre de pila
      * @param apellidos       apellidos
      * @param rol             rol del usuario, fijado por cada subclase
@@ -111,13 +120,7 @@ public abstract class Usuario {
         this.strikes = 0;
     }
 
-    // ============= MÉTODOS =============
-
-    /** Asigna la fecha de registro justo antes de guardar por primera vez. */
-    @PrePersist
-    void alCrear() {
-        this.fechaRegistro = Instant.now();
-    }
+    // ============= GETTERS & SETTERS =============
 
     /** @return identificador único del usuario */
     public Long getId() {
@@ -174,7 +177,10 @@ public abstract class Usuario {
         this.telefono = telefono;
     }
 
-    /** @return clave de la imagen de perfil en el almacenamiento, o {@code null} si no tiene */
+    /**
+     * @return clave de la imagen de perfil en el almacenamiento, o {@code null} si
+     *         no tiene
+     */
     public String getClaveImagenPerfil() {
         return claveImagenPerfil;
     }
@@ -194,7 +200,10 @@ public abstract class Usuario {
         return activo;
     }
 
-    /** @param activo {@code true} para activar la cuenta, {@code false} para bloquearla */
+    /**
+     * @param activo {@code true} para activar la cuenta, {@code false} para
+     *               bloquearla
+     */
     public void setActivo(boolean activo) {
         this.activo = activo;
     }
@@ -215,20 +224,31 @@ public abstract class Usuario {
     }
 
     /** @return Cantidad de advertencias que tiene la cuenta */
-    public int getStrikes(){
+    public int getStrikes() {
         return strikes;
     }
 
-    /** Cambia los strikes de una cuenta y si supera a {@link Config#MAX_STRIKES} se pone la cuenta en inactivo. Activa la cuenta en caso de que se le quiten strikes*/
-    public void setStrikes(int strikes){
-        this.strikes = strikes;
-        if (this.strikes >= Config.MAX_STRIKES) {
-            setActivo(false);
-        }
+    // =========== MÉTODOS ===============
+    /** Asigna la fecha de registro justo antes de guardar por primera vez. */
+    @PrePersist
+    private void alCrear() {
+        this.fechaRegistro = Instant.now();
+    }
 
-        // Activa la cuenta
-        if (strikes < Config.MAX_STRIKES) {
-            setActivo(true);
+    /** Añade 1 strike y si supera a {@link Config#MAX_STRIKES} se pone la cuenta en inactivo */
+    public void aniadirStrike(){
+        if ((this.strikes + 1) >= Config.MAX_STRIKES) {
+            setActivo(false);
+            this.strikes = Config.MAX_STRIKES;
+        } else {
+            this.strikes += 1;
         }
     }
+    /** Resta 1 strike solo si es > {@code 0} */
+    public void quitarStrike(){
+        if (this.strikes > 0) {
+            this.strikes -= 1;
+        }
+    }
+
 }
