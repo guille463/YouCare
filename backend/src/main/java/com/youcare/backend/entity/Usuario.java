@@ -2,6 +2,7 @@ package com.youcare.backend.entity;
 
 import java.time.Instant;
 
+import com.youcare.backend.config.Config;
 import com.youcare.backend.entity.enums.Rol;
 
 import jakarta.persistence.Column;
@@ -19,9 +20,10 @@ import jakarta.persistence.Table;
 /**
  * Entidad base de todos los usuarios de la plataforma YouCare.
  * <p>
- * Agrupa los datos comunes a clientes, cuidadores, administradores y empresas.
- * Usa herencia {@code JOINED}: cada subclase tiene su propia tabla, que comparte
- * clave primaria con {@code usuario}.
+ * Agrupa los datos comunes a clientes, cuidadores, administradores y empresas,
+ * incluida la imagen de perfil y la ubicación usada en la búsqueda por radio.
+ * Usa herencia {@code JOINED}: cada subclase tiene su propia tabla, que
+ * comparte clave primaria con {@code usuario}.
  * </p>
  *
  */
@@ -36,35 +38,47 @@ public abstract class Usuario {
     private Long id;
 
     /** Correo electrónico, único y usado para iniciar sesión. */
-    @Column(nullable = false, unique = true, length = 255)
+    @Column(nullable = false, unique = true, length = Config.MAX_LONGITUD_EMAIL)
     private String email;
 
     /** Hash BCrypt de la contraseña. La contraseña en claro nunca se almacena. */
-    @Column(name = "hash_contrasenia", nullable = false, length = 100)
+    @Column(name = "hash_contrasenia", nullable = false, length = Config.MAX_LONGITUD_CONTRASENIA)
     private String hashContrasenia;
 
-    /** Nombre de pila del usuario (en una empresa, de la persona de contacto). */
-    @Column(nullable = false, length = 100)
+    /** Nombre completo del usuario o razón social si es una empresa. */
+    @Column(nullable = false, length= Config.MAX_LONGITUD_NOMBRE)
     private String nombre;
 
     /** Apellidos del usuario (en una empresa, de la persona de contacto). */
-    @Column(nullable = false, length = 150)
+    @Column(nullable = false, length = Config.MAX_LONGITUD_NOMBRE)
     private String apellidos;
 
     /** Teléfono de contacto. */
-    @Column(length = 20)
+    @Column(length = Config.MAX_LONGITUD_TELEFONO)
     private String telefono;
 
     /**
      * Clave del objeto de la imagen de perfil en el almacenamiento (R2).
      * No es una URL: la URL firmada la genera {@code StorageService} en cada petición.
      */
-    @Column(name = "clave_imagen_perfil", length = 255)
+    @Column(name = "clave_imagen_perfil", length = Config.MAX_LONGITUD_CLAVE_IMG)
     private String claveImagenPerfil;
 
-    /** Rol del usuario en la plataforma, fijado por cada subclase. */
+    /**
+     * Latitud de la ubicación en grados (WGS84), o {@code null} si no la ha
+     * indicado.
+     */
+    private Double latitud;
+
+    /**
+     * Longitud de la ubicación en grados (WGS84), o {@code null} si no la ha
+     * indicado.
+     */
+    private Double longitud;
+
+    /** Rol del usuario en la plataforma. */
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
+    @Column(nullable = false, length = Config.MAX_LONGITUD_ROL)
     private Rol rol;
 
     /** Indica si la cuenta está activa. Una cuenta bloqueada no puede acceder. */
@@ -174,6 +188,26 @@ public abstract class Usuario {
     /** @param claveImagenPerfil clave del objeto en el almacenamiento */
     public void setClaveImagenPerfil(String claveImagenPerfil) {
         this.claveImagenPerfil = claveImagenPerfil;
+    }
+
+    /** @return latitud en grados, o {@code null} si no tiene ubicación */
+    public Double getLatitud() {
+        return latitud;
+    }
+
+    /** @param latitud latitud en grados, entre -90 y 90 */
+    public void setLatitud(Double latitud) {
+        this.latitud = latitud;
+    }
+
+    /** @return longitud en grados, o {@code null} si no tiene ubicación */
+    public Double getLongitud() {
+        return longitud;
+    }
+
+    /** @param longitud longitud en grados, entre -180 y 180 */
+    public void setLongitud(Double longitud) {
+        this.longitud = longitud;
     }
 
     /** @return rol del usuario */
