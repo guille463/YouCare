@@ -15,6 +15,7 @@ public final class Config {
 
     /** Para evitar ataques de denegación */
     public static final int MAX_LONGITUD_CONTRASENIA = 64;
+    public static final int MAX_LONGITUD_HASH_CONTRASENIA = 100;
 
     public static final int HORAS_VALIDEZ_RECUPERACION_CONTRASENIA = 1;
     /**
@@ -42,10 +43,10 @@ public final class Config {
     //====ADMIN====
     public static final int MAX_LONGITUD_DEPARTAMENTO_ADMIN = 100; 
 
-    //=====NOMBRE========
+    //=====NOMBRE Y APELLIDOS ========
     public static final String PATRON_NOMBRE_Y_APELLIDOS = "^[\\p{L}]+(?:[ '-][\\p{L}]+)*$"; 
-    public static final int MAX_LONGITUD_NOMBRE = 255;
-
+    public static final int MAX_LONGITUD_NOMBRE = 100;
+    public static final int MAX_LONGITUD_APELLIDOS = 150;
 
     // ================ EMAIL ===================
     public static final int HORAS_VALIDEZ_EMAIL = 24;
@@ -82,4 +83,6 @@ public final class Config {
     // ==== DIRECCION ===
     public static final String PATRON_DIRECCION = "^(?=.*[a-zA-Z0-9áéíóúÁÉÍÓÚüÜñÑ])[a-zA-Z0-9áéíóúÁÉÍÓÚüÜñÑºª.,/#' -]+$";
 
+    // ========= STRIKE ===========
+    public static final int MAX_STRIKES = 3;
 }

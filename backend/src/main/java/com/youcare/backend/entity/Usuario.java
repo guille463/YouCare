@@ -42,7 +42,7 @@ public abstract class Usuario {
     private String email;
 
     /** Hash BCrypt de la contraseña. La contraseña en claro nunca se almacena. */
-    @Column(name = "hash_contrasenia", nullable = false, length = Config.MAX_LONGITUD_CONTRASENIA)
+    @Column(name = "hash_contrasenia", nullable = false, length = Config.MAX_LONGITUD_HASH_CONTRASENIA)
     private String hashContrasenia;
 
     /** Nombre completo del usuario o razón social si es una empresa. */
@@ -50,11 +50,11 @@ public abstract class Usuario {
     private String nombre;
 
     /** Apellidos del usuario (en una empresa, de la persona de contacto). */
-    @Column(nullable = false, length = Config.MAX_LONGITUD_NOMBRE)
+    @Column(nullable = false, length = Config.MAX_LONGITUD_APELLIDOS)
     private String apellidos;
 
     /** Teléfono de contacto. */
-    @Column(length = Config.MAX_LONGITUD_TELEFONO)
+    @Column(length = Config.MAX_LONGITUD_TELEFONO, nullable = false, unique = true)
     private String telefono;
 
     /**
@@ -93,6 +93,10 @@ public abstract class Usuario {
     @Column(name = "fecha_registro", nullable = false, updatable = false)
     private Instant fechaRegistro;
 
+    /** Cantidad de advertencias que tiene la cuenta. Si alcanza la cantidad de {@link Config#MAX_STRIKES} la cuenta queda inactiva */
+    @Column(name = "cantidad_strikes", nullable = false)
+    private int strikes;
+
     // ========== CONSTRUCTORES ===========
 
     /** Constructor sin argumentos requerido por JPA. No debe usarse directamente. */
@@ -109,12 +113,14 @@ public abstract class Usuario {
      * @param apellidos       apellidos
      * @param rol             rol del usuario, fijado por cada subclase
      */
-    protected Usuario(String email, String hashContrasenia, String nombre, String apellidos, Rol rol) {
+    protected Usuario(String email, String hashContrasenia, String nombre, String apellidos, Rol rol, String telefono) {
         this.email = email;
         this.hashContrasenia = hashContrasenia;
         this.nombre = nombre;
         this.apellidos = apellidos;
         this.rol = rol;
+        this.telefono = telefono;
+        this.strikes = 0;
     }
 
     // ============= MÉTODOS =============
@@ -238,5 +244,23 @@ public abstract class Usuario {
     /** @return fecha y hora de registro (UTC) */
     public Instant getFechaRegistro() {
         return fechaRegistro;
+    }
+
+    /** @return Cantidad de advertencias que tiene la cuenta */
+    public int getStrikes(){
+        return strikes;
+    }
+
+    /** Cambia los strikes de una cuenta y si supera a {@link Config#MAX_STRIKES} se pone la cuenta en inactivo. Activa la cuenta en caso de que se le quiten strikes*/
+    public void setStrikes(int strikes){
+        this.strikes = strikes;
+        if (this.strikes >= Config.MAX_STRIKES) {
+            setActivo(false);
+        }
+
+        // Activa la cuenta
+        if (strikes < Config.MAX_STRIKES) {
+            setActivo(true);
+        }
     }
 }

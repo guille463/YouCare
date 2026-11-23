@@ -40,8 +40,8 @@ public class Admin extends Usuario {
      * @param nombre          nombre de pila del administrador
      * @param apellidos       apellidos del administrador
      */
-    public Admin(String email, String hashContrasenia, String nombre, String apellidos) {
-        super(email, hashContrasenia, nombre, apellidos, Rol.ADMIN);
+    public Admin(String email, String hashContrasenia, String nombre, String apellidos, String telefono) {
+        super(email, hashContrasenia, nombre, apellidos, Rol.ADMIN, telefono);
     }
 
     // ============= GETTERS/SETTERS =============

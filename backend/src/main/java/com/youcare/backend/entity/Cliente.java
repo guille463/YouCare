@@ -48,8 +48,8 @@ public class Cliente extends Usuario {
      * @param nombre          nombre completo del cliente
      * @param fechaNacimiento fecha de nacimiento del cliente
      */
-    public Cliente(String email, String contrasenia, String nombre, String apellidos, LocalDate fechaNacimiento) {
-        super(email, contrasenia, nombre, apellidos, Rol.CLIENTE);
+    public Cliente(String email, String contrasenia, String nombre, String apellidos, LocalDate fechaNacimiento, String telefono) {
+        super(email, contrasenia, nombre, apellidos, Rol.CLIENTE, telefono);
         this.fechaNacimiento = fechaNacimiento;
     }
 
