@@ -1,10 +1,12 @@
 package com.youcare.backend.entity;
 
+import com.youcare.backend.config.Config;
 import com.youcare.backend.entity.enums.Rol;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
+
 
 /**
  * Usuario con permisos de administración y moderación en la plataforma YouCare.
@@ -21,7 +23,7 @@ public class Admin extends Usuario {
      * Cargo o departamento interno del administrador (opcional).
      * Ejemplo: "Soporte", "Moderación", "Superadmin".
      */
-    @Column(length = 100)
+    @Column(length = Config.MAX_LONGITUD_DEPARTAMENTO_ADMIN)
     private String departamento;
 
     /**

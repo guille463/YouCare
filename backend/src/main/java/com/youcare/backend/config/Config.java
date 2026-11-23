@@ -37,12 +37,13 @@ public final class Config {
      * {@link #MIN_LONGITUD_CONTRASENIA}.
      * </p>
      */
-
     public static final String PATRON_CONTRASENIA = "^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)[A-Za-z\\d@$!%*?&._-]+$";
    
+    //====ADMIN====
+    public static final int MAX_LONGITUD_DEPARTAMENTO_ADMIN = 100; 
 
-    //===== NOMBRE========
-    // public static final String 
+    //=====NOMBRE========
+    public static final String PATRON_NOMBRE_Y_APELLIDOS = "^[\\p{L}]+(?:[ '-][\\p{L}]+)*$"; 
     public static final int MAX_LONGITUD_NOMBRE = 255;
 
 
@@ -74,5 +75,11 @@ public final class Config {
 
     //======= ROL========
     public static final int MAX_LONGITUD_ROL = 20;
+
+    // ==== CIUDAD====
+    public static final String PATRON_CIUDAD = "^[a-zA-ZáéíóúÁÉÍÓÚüÜñÑ]+(?:[ '/-][a-zA-ZáéíóúÁÉÍÓÚüÜñÑ]+)*$";
+
+    // ==== DIRECCION ===
+    public static final String PATRON_DIRECCION = "^(?=.*[a-zA-Z0-9áéíóúÁÉÍÓÚüÜñÑ])[a-zA-Z0-9áéíóúÁÉÍÓÚüÜñÑºª.,/#' -]+$";
 
 }
