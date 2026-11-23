@@ -64,18 +64,6 @@ public abstract class Usuario {
     @Column(name = "clave_imagen_perfil", length = Config.MAX_LONGITUD_CLAVE_IMG)
     private String claveImagenPerfil;
 
-    /**
-     * Latitud de la ubicación en grados (WGS84), o {@code null} si no la ha
-     * indicado.
-     */
-    private Double latitud;
-
-    /**
-     * Longitud de la ubicación en grados (WGS84), o {@code null} si no la ha
-     * indicado.
-     */
-    private Double longitud;
-
     /** Rol del usuario en la plataforma. */
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = Config.MAX_LONGITUD_ROL)
@@ -194,26 +182,6 @@ public abstract class Usuario {
     /** @param claveImagenPerfil clave del objeto en el almacenamiento */
     public void setClaveImagenPerfil(String claveImagenPerfil) {
         this.claveImagenPerfil = claveImagenPerfil;
-    }
-
-    /** @return latitud en grados, o {@code null} si no tiene ubicación */
-    public Double getLatitud() {
-        return latitud;
-    }
-
-    /** @param latitud latitud en grados, entre -90 y 90 */
-    public void setLatitud(Double latitud) {
-        this.latitud = latitud;
-    }
-
-    /** @return longitud en grados, o {@code null} si no tiene ubicación */
-    public Double getLongitud() {
-        return longitud;
-    }
-
-    /** @param longitud longitud en grados, entre -180 y 180 */
-    public void setLongitud(Double longitud) {
-        this.longitud = longitud;
     }
 
     /** @return rol del usuario */
