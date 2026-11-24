@@ -173,7 +173,7 @@ Una versión por fase de la hoja de ruta:
 
 # Diario de desarrollo — YouCare
 
-## 22/11/2026 — Guillermo Jiménez
+## 22/11/2026 
 
 ### Resumen
 Puesta en marcha de la base de datos local y primera entidad persistida (`Usuario`). La app ya arranca, conecta con PostgreSQL y Flyway crea las tablas automáticamente.
@@ -251,3 +251,52 @@ Puesta en marcha de la base de datos local y primera entidad persistida (`Usuari
 
 ### Siguiente paso
 Subclases `Admin` y `Cliente` con su migración `V3`.
+
+
+## 23/11/2026 
+
+### Resumen
+Entidad `Admin`, constantes de validación y revisión completa del backend. Se corrigen las diferencias entre las entidades y la migración `V2`, y `Usuario` queda cerrado. La app **todavía no arranca**: faltan las tablas `cliente` y `admin` y la columna `cantidad_strikes`, que irán en `V3`.
+
+### Qué hemos hecho
+
+**1. Merge de `develop` en `feature/backend-setup`**
+- Se integra el trabajo de Jorge (`Cliente`, latitud y longitud en `Usuario`) con el de Guillermo (Docker, perfiles, migraciones).
+
+**2. Entidad `Admin`**
+- Hereda de `Usuario` (`JOINED`) y añade `departamento`, que es opcional.
+- Sigue heredando de `Usuario` porque comparte el login (email, hash, rol, activo). Si no heredara, habría dos tablas de login y emails duplicados entre ellas.
+
+**3. `Config.java`**
+- Patrones de validación: nombre y apellidos, teléfono, DNI/NIE, CIF, ciudad y dirección.
+- Constantes en lugar de números mágicos en las `@Column`.
+
+**4. Excepciones**
+- `EdadMinimaException` → `ValidacionException(campo, mensaje)`: una sola excepción genérica que indica qué campo ha fallado.
+
+**5. Longitudes iguales en Java y en SQL**
+- `MAX_LONGITUD_NOMBRE` 255 → 100 y nueva `MAX_LONGITUD_APELLIDOS = 150`, igual que en `V2`.
+- Dos constantes distintas para la contraseña:
+  - `MAX_LONGITUD_CONTRASENIA = 64`: contraseña en claro, evita DoS con contraseñas enormes.
+  - `MAX_LONGITUD_HASH_CONTRASENIA = 100`: columna del hash. `{bcrypt}` + hash ocupa 68 caracteres y no cabría en 64.
+- `validate` no comprueba longitudes. Si no coinciden, el fallo sale en el primer `INSERT` largo.
+
+**6. Ubicación fuera de `Usuario`**
+- Se quitan `latitud` y `longitud`. Admin y cliente no las necesitan (minimización de datos, RGPD).
+- Irán como `geography(Point, 4326)` con índice GiST en `Cuidador` y `Empresa` (Sprint 3), y en la persona cuidada o la reserva (Sprint 4).
+- El cliente no guarda ubicación: el punto de búsqueda llega en cada petición (`?lat=&lng=&radioKm=`) y sale del domicilio de la persona cuidada, del GPS o de una dirección.
+
+**7. Strikes**
+- Nuevo campo `strikes` (columna `cantidad_strikes`), con `MAX_STRIKES = 3`.
+- Sin setter público, para encapsular la regla:
+  - `aniadirStrike()`: suma 1, con tope en 3. Al llegar a 3, bloquea la cuenta (`activo = false`).
+  - `quitarStrike()`: resta 1, nunca baja de 0 y no reactiva la cuenta.
+- Bloquear es automático; reactivar es una decisión del admin (trazabilidad, DSA).
+
+**8. Teléfono**
+- Obligatorio (`nullable = false`), pero no único: hay hogares que comparten teléfono. El identificador único es el email.
+
+**9. Email normalizado**
+- Nueva clase `util/EmailUtil`: `normalizar(email)` → `trim()` + `toLowerCase(Locale.ROOT)`.
+- Se usa en el constructor y en `setEmail` de `Usuario`.
+- Evita cuentas

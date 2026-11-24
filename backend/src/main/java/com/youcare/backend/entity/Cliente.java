@@ -1,6 +1,8 @@
 package com.youcare.backend.entity;
 
 import java.time.LocalDate;
+
+import com.youcare.backend.config.Config;
 import com.youcare.backend.entity.enums.Rol;
 
 import jakarta.persistence.Column;
@@ -25,9 +27,11 @@ public class Cliente extends Usuario {
     private LocalDate fechaNacimiento;
 
     /** Dirección del cliente. */
+    @Column(length = Config.MAX_LONGITUD_DIRECCION)
     private String direccion;
 
     /** Ciudad de residencia. */
+    @Column(length = Config.MAX_LONGITUD_CIUDAD)
     private String ciudad;
 
     // ========== CONSTRUCTORES ===========
@@ -48,7 +52,8 @@ public class Cliente extends Usuario {
      * @param nombre          nombre completo del cliente
      * @param fechaNacimiento fecha de nacimiento del cliente
      */
-    public Cliente(String email, String contrasenia, String nombre, String apellidos, LocalDate fechaNacimiento, String telefono) {
+    public Cliente(String email, String contrasenia, String nombre, String apellidos, LocalDate fechaNacimiento,
+            String telefono) {
         super(email, contrasenia, nombre, apellidos, Rol.CLIENTE, telefono);
         this.fechaNacimiento = fechaNacimiento;
     }
@@ -86,6 +91,5 @@ public class Cliente extends Usuario {
     public void setCiudad(String ciudad) {
         this.ciudad = ciudad;
     }
-
 
 }

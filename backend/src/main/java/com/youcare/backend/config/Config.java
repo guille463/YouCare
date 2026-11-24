@@ -79,9 +79,11 @@ public final class Config {
 
     // ==== CIUDAD====
     public static final String PATRON_CIUDAD = "^[a-zA-ZáéíóúÁÉÍÓÚüÜñÑ]+(?:[ '/-][a-zA-ZáéíóúÁÉÍÓÚüÜñÑ]+)*$";
+    public static final int MAX_LONGITUD_CIUDAD = 100;
 
     // ==== DIRECCION ===
     public static final String PATRON_DIRECCION = "^(?=.*[a-zA-Z0-9áéíóúÁÉÍÓÚüÜñÑ])[a-zA-Z0-9áéíóúÁÉÍÓÚüÜñÑºª.,/#' -]+$";
+    public static final int MAX_LONGITUD_DIRECCION = 200;
 
     // ========= STRIKE ===========
     public static final int MAX_STRIKES = 3;

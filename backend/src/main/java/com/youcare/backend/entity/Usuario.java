@@ -57,6 +57,7 @@ public abstract class Usuario {
     /** Teléfono de contacto. */
     @Column(length = Config.MAX_LONGITUD_TELEFONO, nullable = false)
     private String telefono;
+    
 
     /**
      * Clave del objeto de la imagen de perfil en el almacenamiento (R2).
