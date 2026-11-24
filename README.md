@@ -142,6 +142,44 @@ El prefijo indica la parte del proyecto:
 4. Antes de abrir la PR: `develop` actualizado en tu rama, todo compila y los tests pasan.
 5. Nunca se suben credenciales. Las variables reales van en `.env` (ignorado por Git); en el repo solo está `.env.example`.
 
+## Flyway: cómo trabajar con la base de datos
+
+### Qué es
+Flyway crea y modifica la BD con scripts SQL numerados (`V1__...sql`, `V2__...sql`…) que están en
+`backend/src/main/resources/db/migration/`.
+Al arrancar la app, Flyway ejecuta los que faltan, en orden, una sola vez.
+En la tabla `flyway_schema_history` guarda cuáles ha aplicado.
+Hibernate NO crea tablas (`ddl-auto=validate`): solo comprueba que las entidades coinciden con la BD.
+Si no coinciden, la app no arranca.
+
+### Reglas
+1. **Nunca editar un `V` que ya esté en el repo.** Flyway guarda su checksum.
+   Si cambia el archivo, la app falla con `checksum mismatch`.
+2. **Cualquier cambio va en una migración nueva** con el siguiente número:
+   `V5__descripcion.sql`, `V6__...`
+3. **Una migración por propósito:** `V5__crear_cuidador.sql`, no `V5__cosas.sql`.
+4. **Avisad antes de crear una `V`**, para no tener dos `V5` en ramas distintas.
+5. **Formato del nombre:** `V` + número + **dos** guiones bajos + descripción.
+   Con un solo guion bajo, Flyway no lo detecta.
+
+### Si añades un campo a una entidad
+1. Añade el atributo en Java, con su `@Column`.
+2. Crea `V<n>__....sql` con el `ALTER TABLE` o el `CREATE TABLE`.
+3. Arranca la app. Si sale `missing column`, el campo de Java y el SQL no coinciden.
+4. Haz commit del Java y del SQL **juntos**.
+
+### Después de hacer `pull`
+Arranca normal: Flyway aplica solo las migraciones nuevas.
+
+### Si falla con `checksum mismatch` o quieres la BD limpia
+Desde la raíz del repo:
+    docker compose down -v
+    docker compose up -d
+Esto borra la BD local; al arrancar, Flyway la reconstruye desde V1.
+
+### Comprobar qué se ha aplicado
+    docker compose exec db psql -U youcare -d youcare -c "SELECT version, description, success FROM flyway_schema_history"
+
 ### Mensajes de commit
 
 Formato [Conventional Commits](https://www.conventionalcommits.org/es/):
