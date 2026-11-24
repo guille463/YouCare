@@ -10,7 +10,6 @@ CREATE TABLE usuario (
     activo              BOOLEAN      NOT NULL DEFAULT TRUE,
     email_verificado    BOOLEAN      NOT NULL DEFAULT FALSE,
     fecha_registro      TIMESTAMPTZ  NOT NULL DEFAULT now(),
-    cantidad_strikes    INT NOT NULL DEFAULT 0 CONSTRAINT CHECK (cantidad_strikes >= 0 AND cantidad_strikes <= 3),
 
     CONSTRAINT uk_usuario_email UNIQUE (email),
     CONSTRAINT ck_usuario_rol   CHECK (rol IN ('ADMIN', 'CLIENTE', 'CUIDADOR', 'EMPRESA'))
