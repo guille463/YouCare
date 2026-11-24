@@ -338,3 +338,41 @@ Entidad `Admin`, constantes de validación y revisión completa del backend. Se 
 - Nueva clase `util/EmailUtil`: `normalizar(email)` → `trim()` + `toLowerCase(Locale.ROOT)`.
 - Se usa en el constructor y en `setEmail` de `Usuario`.
 - Evita cuentas
+
+
+## 24/11/2026 
+
+### Resumen
+La app vuelve a arrancar: Flyway aplica V1–V4 y Hibernate valida `Usuario`, `Cliente` y `Admin` sin errores. Además: configuración de producción con variables de entorno, `.gitignore` en la raíz y primer PR de `feature/backend-setup` a `develop`.
+
+### Qué he hecho
+
+**1. V2 restaurada a su versión original**
+- V2 estaba editada en el repo, con un `CONSTRAINT CHECK` sin nombre (sintaxis inválida).
+- Se recupera la versión del commit en que se creó: `git checkout 74089a4 -- V2__crear_usuario.sql`.
+- **Regla:** un archivo `V` que ya está en el repo no se edita. Flyway guarda su checksum, y cualquier cambio da `checksum mismatch`.
+
+**2. `V3__ajustar_usuario.sql`**
+- `cantidad_strikes INT NOT NULL DEFAULT 0` + `ck_usuario_strikes CHECK (>= 0)`.
+  - El máximo (3) no va en el `CHECK`, porque ya está en `Config.MAX_STRIKES`.
+- `telefono SET NOT NULL`.
+- `ck_usuario_email_minusculas CHECK (email = lower(email))`: refuerza en la BD la normalización de `EmailUtil`.
+
+**3. `V4__crear_cliente_y_admin.sql`**
+- Tablas `cliente` y `admin`: su `id` es PK y a la vez FK hacia `usuario(id)`, con `ON DELETE CASCADE`.
+- El `id` de las hijas no es `IDENTITY`: lo genera `usuario`.
+- `fecha_nacimiento DATE NOT NULL`. La edad mínima se valida en Java, porque un `CHECK` con `now()` no es fiable.
+
+**4. Longitudes en `Cliente`**
+- Nuevas constantes `MAX_LONGITUD_DIRECCION = 200` y `MAX_LONGITUD_CIUDAD = 100`, usadas en las `@Column`.
+- **Criterio para `name` en `@Column`:** solo cuando la columna se llama distinto al atributo (`strikes` → `cantidad_strikes`). En el resto, Spring Boot ya convierte camelCase a snake_case.
+
+**5. `.gitignore` en la raíz**
+- Secretos (`.env`, `.env.*`, excepto `.env.example`), `node_modules/`, Expo, claves de firma (`.jks`, `.p12`…), builds, IDEs, sistema operativo y logs.
+- `backend/.gitignore` se queda para lo de Maven (`target/`).
+
+**6. Perfiles y variables de entorno**
+- `ddl-auto=validate` pasa a `application.properties`, porque vale para todos los perfiles.
+- `application-prod.properties`:
+  - BD y correo con `${VARIABLE}`, sin valores por defecto: si falta una variable, la app no arranca.
+  - `server.port=${PORT:8080}`, porque Render asigna el
