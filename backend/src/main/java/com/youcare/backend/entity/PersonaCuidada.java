@@ -1,9 +1,7 @@
 package com.youcare.backend.entity;
 
 import java.time.LocalDate;
-
 import com.youcare.backend.config.Config;
-
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
