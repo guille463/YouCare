@@ -100,4 +100,8 @@ public final class Config {
 
     // ========= PERSONA CUIDADA ============
     public static final int MAX_LONGITUD_NECESIDADES = 1000;
+
+    // ========= EMPRESA ============
+    public static final int MAX_LONGITUD_RAZON_SOCIAL = 150;
+    public static final int MAX_LONGITUD_CIF = 9;
 }

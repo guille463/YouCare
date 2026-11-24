@@ -174,9 +174,10 @@ public class Cuidador extends Usuario {
     public void aniadirDocumento(Documento documento) {
         this.documentos.add(documento);
         // Pone el estado a pendiente en caso de que se haya subido un documento de tipo
-        // certificado profesional
+        // certificado profesional y no tuviese archivos o fuesen rechazados.
         if (documento.getTipo() == TipoDocumento.CERTIFICADO_PROFESIONAL
-                && this.estadoVerificacion == EstadoVerificacion.SIN_SUBIR) {
+                && (this.estadoVerificacion == EstadoVerificacion.SIN_SUBIR
+                        || this.estadoVerificacion == EstadoVerificacion.RECHAZADO)) {
             this.estadoVerificacion = EstadoVerificacion.PENDIENTE;
         }
     }
