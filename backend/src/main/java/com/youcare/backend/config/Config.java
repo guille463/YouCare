@@ -39,12 +39,12 @@ public final class Config {
      * </p>
      */
     public static final String PATRON_CONTRASENIA = "^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)[A-Za-z\\d@$!%*?&._-]+$";
-   
-    //====ADMIN====
-    public static final int MAX_LONGITUD_DEPARTAMENTO_ADMIN = 100; 
 
-    //=====NOMBRE Y APELLIDOS ========
-    public static final String PATRON_NOMBRE_Y_APELLIDOS = "^[\\p{L}]+(?:[ '-][\\p{L}]+)*$"; 
+    // ====ADMIN====
+    public static final int MAX_LONGITUD_DEPARTAMENTO_ADMIN = 100;
+
+    // =====NOMBRE Y APELLIDOS ========
+    public static final String PATRON_NOMBRE_Y_APELLIDOS = "^[\\p{L}]+(?:[ '-][\\p{L}]+)*$";
     public static final int MAX_LONGITUD_NOMBRE = 100;
     public static final int MAX_LONGITUD_APELLIDOS = 150;
 
@@ -60,7 +60,7 @@ public final class Config {
 
     // ============= DNI ============
     public static final String PATRON_DNI_NIE = "^([0-9]{8}|[XYZ][0-9]{7})[TRWAGMYFPDXBNJZSQVHLCKE]$";
-
+    public static final int MAX_LONGITUD_DNI_NIE = 9;
     // =========== CIF ============
     public static final String PATRON_CIF = "^[ABCDEFGHJNPQRSUVW][0-9]{7}[0-9A-J]$";
 
@@ -69,12 +69,12 @@ public final class Config {
     public static final long MAX_TAMANIO_IMAGEN_BYTES = 5L * 1024 * 1024;
     public static final List<String> EXTENSIONES_IMAGEN_PERMITIDAS = List.of("jpg", "jpeg", "png", "webp");
     public static final String IMAGEN_PERFIL_POR_DEFECTO = "/assets/img/default-avatar.png";
-    public static final int MAX_LONGITUD_CLAVE_IMG = 255; 
+    public static final int MAX_LONGITUD_CLAVE_IMG = 255;
 
     // =========== EDAD ============
     public static final int EDAD_MINIMA_REGISTRO = 18;
 
-    //======= ROL========
+    // ======= ROL========
     public static final int MAX_LONGITUD_ROL = 20;
 
     // ==== CIUDAD====
@@ -87,4 +87,17 @@ public final class Config {
 
     // ========= STRIKE ===========
     public static final int MAX_STRIKES = 3;
+
+    // ========= CUIDADOR ============
+
+    /** Longitud de las columnas que guardan un enum de estado */
+    public static final int MAX_LONGITUD_ESTADO = 20;
+    public static final int MAX_LONGITUD_TIPO_DOCUMENTO = 30;
+    /** Clave del documento en el almacenamiento privado no es URL */
+    public static final int MAX_LONGITUD_CLAVE_DOCUMENTO = 255;
+    public static final int MAX_LONGITUD_MOTIVO_RECHAZO = 500;
+    public static final int MAX_LONGITUD_DIA_SEMANA = 10;
+
+    // ========= PERSONA CUIDADA ============
+    public static final int MAX_LONGITUD_NECESIDADES = 1000;
 }
