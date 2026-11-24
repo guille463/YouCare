@@ -9,7 +9,6 @@ import com.youcare.backend.entity.embeddable.FranjaHoraria;
 import com.youcare.backend.entity.enums.EstadoEnEmpresa;
 import com.youcare.backend.entity.enums.EstadoVerificacion;
 import com.youcare.backend.entity.enums.Rol;
-import com.youcare.backend.entity.enums.TipoDocumento;
 import com.youcare.backend.exception.ValidacionException;
 import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
@@ -73,12 +72,12 @@ public class Cuidador extends Usuario {
     }
 
     /**
-     * Crea un cuidador autónomo y sin verificar.
+     * Crea un cuidador autónomo y sin documentos subidos.
      *
      * @param email           correo electrónico, único
      * @param hashContrasenia hash BCrypt de la contraseña, nunca la contraseña en
-     *                        si
-     * @param nombre          nombre cuidador
+     *                        claro
+     * @param nombre          nombre del cuidador
      * @param apellidos       apellidos
      * @param dniNie          DNI o NIE
      * @param telefono        teléfono de contacto
@@ -91,6 +90,7 @@ public class Cuidador extends Usuario {
     }
 
     // ============= GETTERS & SETTERS =============
+
     /** @return DNI o NIE */
     public String getDniNie() {
         return dniNie;
@@ -138,14 +138,14 @@ public class Cuidador extends Usuario {
         this.estadoVerificacion = estadoVerificacion;
     }
 
-    /** @return documentos subidos */
+    /** @return documentos subidos (lista de solo lectura) */
     public List<Documento> getDocumentos() {
-        return documentos;
+        return Collections.unmodifiableList(documentos);
     }
 
     /** @return franjas de disponibilidad (lista de solo lectura) */
     public List<FranjaHoraria> getDisponibilidad() {
-        return disponibilidad;
+        return Collections.unmodifiableList(disponibilidad);
     }
 
     // =========== MÉTODOS ===============
@@ -170,14 +170,16 @@ public class Cuidador extends Usuario {
         this.estadoEnEmpresa = null;
     }
 
-    /** @param documento documento recién subido */
+    /**
+     * Añade un documento recién subido. Si la cuenta estaba sin documentos o
+     * rechazada, pasa a {@code PENDIENTE} para que el admin la vuelva a revisar.
+     *
+     * @param documento documento recién subido
+     */
     public void aniadirDocumento(Documento documento) {
         this.documentos.add(documento);
-        // Pone el estado a pendiente en caso de que se haya subido un documento de tipo
-        // certificado profesional y no tuviese archivos o fuesen rechazados.
-        if (documento.getTipo() == TipoDocumento.CERTIFICADO_PROFESIONAL
-                && (this.estadoVerificacion == EstadoVerificacion.SIN_SUBIR
-                        || this.estadoVerificacion == EstadoVerificacion.RECHAZADO)) {
+        if (this.estadoVerificacion == EstadoVerificacion.SIN_SUBIR
+                || this.estadoVerificacion == EstadoVerificacion.RECHAZADO) {
             this.estadoVerificacion = EstadoVerificacion.PENDIENTE;
         }
     }
