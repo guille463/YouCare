@@ -8,11 +8,16 @@ package com.youcare.backend.entity.enums;
  */
 public enum EstadoVerificacion {
     /**
-     * Cuenta registrada con documentos sin revisar o incompletos. No aparece en las busquedas
+     * Cuenta registrada sin documentos.
+     */
+    SIN_SUBIR,
+    /**
+     * Cuenta registrada con documentos sin revisar. No aparece en las busquedas
      */
     PENDIENTE,
     /**
-     * Todos los documentos obligatorios estan aprobados. Puede aparecer en las busquedas  y recibir reservas
+     * Todos los documentos obligatorios estan aprobados. Puede aparecer en las
+     * busquedas y recibir reservas
      */
     VERIFICADO,
     /**
