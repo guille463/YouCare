@@ -1,0 +1,37 @@
+# ===== Secretos =====
+.env
+.env.*
+!.env.example
+
+# ===== Node (mobile y admin) =====
+node_modules/
+npm-debug.log*
+pnpm-debug.log*
+
+# ===== Expo (mobile) =====
+.expo/
+web-build/
+*.jks
+*.keystore
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# ===== Builds (admin con Vite) =====
+dist/
+build/
+coverage/
+
+# ===== IDEs =====
+.idea/
+.vscode/
+*.iml
+
+# ===== Sistema operativo =====
+.DS_Store
+Thumbs.db
+
+# ===== Logs =====
+*.log
+logs/
