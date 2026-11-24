@@ -142,6 +142,44 @@ El prefijo indica la parte del proyecto:
 4. Antes de abrir la PR: `develop` actualizado en tu rama, todo compila y los tests pasan.
 5. Nunca se suben credenciales. Las variables reales van en `.env` (ignorado por Git); en el repo solo está `.env.example`.
 
+## Flyway: cómo trabajar con la base de datos
+
+### Qué es
+Flyway crea y modifica la BD con scripts SQL numerados (`V1__...sql`, `V2__...sql`…) que están en
+`backend/src/main/resources/db/migration/`.
+Al arrancar la app, Flyway ejecuta los que faltan, en orden, una sola vez.
+En la tabla `flyway_schema_history` guarda cuáles ha aplicado.
+Hibernate NO crea tablas (`ddl-auto=validate`): solo comprueba que las entidades coinciden con la BD.
+Si no coinciden, la app no arranca.
+
+### Reglas
+1. **Nunca editar un `V` que ya esté en el repo.** Flyway guarda su checksum.
+   Si cambia el archivo, la app falla con `checksum mismatch`.
+2. **Cualquier cambio va en una migración nueva** con el siguiente número:
+   `V5__descripcion.sql`, `V6__...`
+3. **Una migración por propósito:** `V5__crear_cuidador.sql`, no `V5__cosas.sql`.
+4. **Avisad antes de crear una `V`**, para no tener dos `V5` en ramas distintas.
+5. **Formato del nombre:** `V` + número + **dos** guiones bajos + descripción.
+   Con un solo guion bajo, Flyway no lo detecta.
+
+### Si añades un campo a una entidad
+1. Añade el atributo en Java, con su `@Column`.
+2. Crea `V<n>__....sql` con el `ALTER TABLE` o el `CREATE TABLE`.
+3. Arranca la app. Si sale `missing column`, el campo de Java y el SQL no coinciden.
+4. Haz commit del Java y del SQL **juntos**.
+
+### Después de hacer `pull`
+Arranca normal: Flyway aplica solo las migraciones nuevas.
+
+### Si falla con `checksum mismatch` o quieres la BD limpia
+Desde la raíz del repo:
+    docker compose down -v
+    docker compose up -d
+Esto borra la BD local; al arrancar, Flyway la reconstruye desde V1.
+
+### Comprobar qué se ha aplicado
+    docker compose exec db psql -U youcare -d youcare -c "SELECT version, description, success FROM flyway_schema_history"
+
 ### Mensajes de commit
 
 Formato [Conventional Commits](https://www.conventionalcommits.org/es/):
@@ -166,10 +204,175 @@ Una versión por fase de la hoja de ruta:
 | `v0.3.0` | Fase 3 — Búsqueda y geolocalización       |
 | `v0.4.0` | Fase 4 — Reservas y pagos                 |
 | `v0.5.0` | Fase 5 — Valoraciones, chat y panel admin |
-| `v1.0.0` | Fase 6 — Entrega del TFG                  |
+| `v1.0.0` | Fase 6 — Entrega del TFG |
 
-## DIARIO
 
-### 22/11/2026
 
-- Se crearon las clases Usuario, Cliente, Config y EdadMinimaException: En usuario se agrego latitud y longitud. En Cliente se extendió a usuario y se verifico la edad al crear el cliente. Config mantiene las constantes de la app. EdadMinimaException es un tipo de exception usado para la edad mínima.
+
+# Diario de desarrollo — YouCare
+
+## 22/11/2026 
+
+### Resumen
+Puesta en marcha de la base de datos local y primera entidad persistida (`Usuario`). La app ya arranca, conecta con PostgreSQL y Flyway crea las tablas automáticamente.
+
+### Qué he hecho
+
+**1. Refactor de `Usuario.java`**
+- Se mantiene la herencia `JOINED`: tabla `usuario` con los datos comunes y una tabla por subclase que comparte el `id`.
+- Código en español en todo el proyecto (entidades, columnas y JSON).
+- `contrasenia` → `hashContrasenia`: el campo guarda el hash BCrypt, nunca la contraseña en claro.
+- `imagenPerfilUrl` → `claveImagenPerfil`: se guarda la clave del archivo en R2, porque las URLs firmadas caducan.
+- Nuevo campo `apellidos`: permite mostrar "María G." y ordenar por apellido.
+- `length` en todas las columnas de texto, para que coincidan con los `VARCHAR` de la migración.
+
+**2. Docker Compose** (`docker-compose.yml`, en la raíz)
+- **PostgreSQL 17 + PostGIS** en el puerto **5433**. El 5432 choca con PostgreSQL si lo tienes instalado en Windows.
+- **Mailpit** para probar emails en local (`http://localhost:8025`).
+
+**3. Configuración de Spring** (`backend/src/main/resources/`)
+- `application.properties`: lo común a todos los perfiles, con `dev` como perfil por defecto.
+- `application-dev.properties`: conexión a la BD local, `ddl-auto=validate` y Mailpit.
+- Con `validate`, Hibernate no crea tablas: solo comprueba que la entidad coincide con la tabla. El esquema lo gestiona Flyway.
+
+**4. Migraciones Flyway** (`backend/src/main/resources/db/migration/`)
+- `V1__extensions.sql`: activa `postgis` (búsqueda por distancia) y `btree_gist` (evitar reservas solapadas).
+- `V2__crear_usuario.sql`: tabla `usuario` con email único y `CHECK` de los roles válidos.
+- **Regla:** una migración que ya se ha ejecutado no se edita. Los cambios van en `V3`, `V4`…
+
+**5. `.gitignore`**
+- Se ignoran los secretos (`.env`, `application-local.properties`), los logs y los archivos del sistema operativo.
+- `docker-compose.yml` y `application-dev.properties` sí se suben: solo llevan credenciales locales.
+
+### Problemas resueltos
+| Error | Causa | Solución |
+|---|---|---|
+| `no configuration file provided` | `docker compose` lanzado desde `backend/` | Ejecutarlo desde la raíz del repo |
+| `'url' attribute is not specified` | Faltaba la conexión en `application-dev.properties` | Añadir `spring.datasource.*` |
+| `la autentificación password falló` | Respondía el PostgreSQL de Windows, no el contenedor | Cambiar el contenedor al puerto 5433 |
+
+### Cómo comprobar que funciona
+
+**Requisito:** Docker Desktop abierto, con *Engine running*.
+
+**1. Levantar la BD** (desde la raíz del repo)
+    docker compose up -d
+    docker compose ps
+✅ `youcare-db` aparece como `healthy`.
+
+**2. Compilar** (desde `backend/`)
+    ./mvnw compile
+✅ `BUILD SUCCESS`.
+
+**3. Arrancar la app** (desde `backend/`)
+    ./mvnw spring-boot:run
+✅ En el log aparecen:
+- `Successfully applied N migrations`
+- `Started BackendApplication`
+
+❌ Si sale `APPLICATION FAILED TO START`, el motivo está en la sección `Description`.
+
+**4. Ver la tabla** (otra terminal, desde la raíz)
+    docker compose exec db psql -U youcare -d youcare -c "\d usuario"
+✅ Aparecen las 11 columnas y las restricciones `uk_usuario_email` y `ck_usuario_rol`.
+
+**5. Empezar con la BD vacía** (si una migración falla o queréis datos limpios)
+    docker compose down -v
+    docker compose up -d
+⚠️ Borra todos los datos locales.
+
+### Commits
+- `refactor(backend): ajustar Usuario al modelo de datos`
+- `chore: añadir docker-compose con PostGIS y Mailpit`
+- `chore(backend): configurar perfiles y conexión a la BD local`
+- `feat(backend): añadir migraciones de extensiones y usuario`
+
+### Siguiente paso
+Subclases `Admin` y `Cliente` con su migración `V3`.
+
+
+## 23/11/2026 
+
+### Resumen
+Entidad `Admin`, constantes de validación y revisión completa del backend. Se corrigen las diferencias entre las entidades y la migración `V2`, y `Usuario` queda cerrado. La app **todavía no arranca**: faltan las tablas `cliente` y `admin` y la columna `cantidad_strikes`, que irán en `V3`.
+
+### Qué hemos hecho
+
+**1. Merge de `develop` en `feature/backend-setup`**
+- Se integra el trabajo de Jorge (`Cliente`, latitud y longitud en `Usuario`) con el de Guillermo (Docker, perfiles, migraciones).
+
+**2. Entidad `Admin`**
+- Hereda de `Usuario` (`JOINED`) y añade `departamento`, que es opcional.
+- Sigue heredando de `Usuario` porque comparte el login (email, hash, rol, activo). Si no heredara, habría dos tablas de login y emails duplicados entre ellas.
+
+**3. `Config.java`**
+- Patrones de validación: nombre y apellidos, teléfono, DNI/NIE, CIF, ciudad y dirección.
+- Constantes en lugar de números mágicos en las `@Column`.
+
+**4. Excepciones**
+- `EdadMinimaException` → `ValidacionException(campo, mensaje)`: una sola excepción genérica que indica qué campo ha fallado.
+
+**5. Longitudes iguales en Java y en SQL**
+- `MAX_LONGITUD_NOMBRE` 255 → 100 y nueva `MAX_LONGITUD_APELLIDOS = 150`, igual que en `V2`.
+- Dos constantes distintas para la contraseña:
+  - `MAX_LONGITUD_CONTRASENIA = 64`: contraseña en claro, evita DoS con contraseñas enormes.
+  - `MAX_LONGITUD_HASH_CONTRASENIA = 100`: columna del hash. `{bcrypt}` + hash ocupa 68 caracteres y no cabría en 64.
+- `validate` no comprueba longitudes. Si no coinciden, el fallo sale en el primer `INSERT` largo.
+
+**6. Ubicación fuera de `Usuario`**
+- Se quitan `latitud` y `longitud`. Admin y cliente no las necesitan (minimización de datos, RGPD).
+- Irán como `geography(Point, 4326)` con índice GiST en `Cuidador` y `Empresa` (Sprint 3), y en la persona cuidada o la reserva (Sprint 4).
+- El cliente no guarda ubicación: el punto de búsqueda llega en cada petición (`?lat=&lng=&radioKm=`) y sale del domicilio de la persona cuidada, del GPS o de una dirección.
+
+**7. Strikes**
+- Nuevo campo `strikes` (columna `cantidad_strikes`), con `MAX_STRIKES = 3`.
+- Sin setter público, para encapsular la regla:
+  - `aniadirStrike()`: suma 1, con tope en 3. Al llegar a 3, bloquea la cuenta (`activo = false`).
+  - `quitarStrike()`: resta 1, nunca baja de 0 y no reactiva la cuenta.
+- Bloquear es automático; reactivar es una decisión del admin (trazabilidad, DSA).
+
+**8. Teléfono**
+- Obligatorio (`nullable = false`), pero no único: hay hogares que comparten teléfono. El identificador único es el email.
+
+**9. Email normalizado**
+- Nueva clase `util/EmailUtil`: `normalizar(email)` → `trim()` + `toLowerCase(Locale.ROOT)`.
+- Se usa en el constructor y en `setEmail` de `Usuario`.
+- Evita cuentas
+
+
+## 24/11/2026 
+
+### Resumen
+La app vuelve a arrancar: Flyway aplica V1–V4 y Hibernate valida `Usuario`, `Cliente` y `Admin` sin errores. Además: configuración de producción con variables de entorno, `.gitignore` en la raíz y primer PR de `feature/backend-setup` a `develop`.
+
+### Qué he hecho
+
+**1. V2 restaurada a su versión original**
+- V2 estaba editada en el repo, con un `CONSTRAINT CHECK` sin nombre (sintaxis inválida).
+- Se recupera la versión del commit en que se creó: `git checkout 74089a4 -- V2__crear_usuario.sql`.
+- **Regla:** un archivo `V` que ya está en el repo no se edita. Flyway guarda su checksum, y cualquier cambio da `checksum mismatch`.
+
+**2. `V3__ajustar_usuario.sql`**
+- `cantidad_strikes INT NOT NULL DEFAULT 0` + `ck_usuario_strikes CHECK (>= 0)`.
+  - El máximo (3) no va en el `CHECK`, porque ya está en `Config.MAX_STRIKES`.
+- `telefono SET NOT NULL`.
+- `ck_usuario_email_minusculas CHECK (email = lower(email))`: refuerza en la BD la normalización de `EmailUtil`.
+
+**3. `V4__crear_cliente_y_admin.sql`**
+- Tablas `cliente` y `admin`: su `id` es PK y a la vez FK hacia `usuario(id)`, con `ON DELETE CASCADE`.
+- El `id` de las hijas no es `IDENTITY`: lo genera `usuario`.
+- `fecha_nacimiento DATE NOT NULL`. La edad mínima se valida en Java, porque un `CHECK` con `now()` no es fiable.
+
+**4. Longitudes en `Cliente`**
+- Nuevas constantes `MAX_LONGITUD_DIRECCION = 200` y `MAX_LONGITUD_CIUDAD = 100`, usadas en las `@Column`.
+- **Criterio para `name` en `@Column`:** solo cuando la columna se llama distinto al atributo (`strikes` → `cantidad_strikes`). En el resto, Spring Boot ya convierte camelCase a snake_case.
+
+**5. `.gitignore` en la raíz**
+- Secretos (`.env`, `.env.*`, excepto `.env.example`), `node_modules/`, Expo, claves de firma (`.jks`, `.p12`…), builds, IDEs, sistema operativo y logs.
+- `backend/.gitignore` se queda para lo de Maven (`target/`).
+
+**6. Perfiles y variables de entorno**
+- `ddl-auto=validate` pasa a `application.properties`, porque vale para todos los perfiles.
+- `application-prod.properties`:
+  - BD y correo con `${VARIABLE}`, sin valores por defecto: si falta una variable, la app no arranca.
+  - `server.port=${PORT:8080}`, porque Render asigna el

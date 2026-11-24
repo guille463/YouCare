@@ -1,9 +1,22 @@
 package com.youcare.backend.entity;
 
-import jakarta.persistence.*;
 import java.time.Instant;
 
+import com.youcare.backend.config.Config;
 import com.youcare.backend.entity.enums.Rol;
+import com.youcare.backend.util.EmailUtil;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Inheritance;
+import jakarta.persistence.InheritanceType;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.Table;
 
 /**
  * Entidad base de todos los usuarios de la plataforma YouCare.
@@ -14,7 +27,6 @@ import com.youcare.backend.entity.enums.Rol;
  * comparte clave primaria con {@code usuario}.
  * </p>
  *
- * @author Jorge Martín Llaneli
  */
 @Entity
 @Table(name = "usuario")
@@ -27,42 +39,40 @@ public abstract class Usuario {
     private Long id;
 
     /** Correo electrónico, único y usado para iniciar sesión. */
-    @Column(nullable = false, unique = true)
+    @Column(nullable = false, unique = true, length = Config.MAX_LONGITUD_EMAIL)
     private String email;
 
-    /** Hash BCrypt de la contraseña. La contraseña real nunca se almacena. */
-    @Column(name = "contrasenia", nullable = false)
-    private String contrasenia;
+    /** Hash BCrypt de la contraseña. La contraseña en claro nunca se almacena. */
+    @Column(name = "hash_contrasenia", nullable = false, length = Config.MAX_LONGITUD_HASH_CONTRASENIA)
+    private String hashContrasenia;
 
     /** Nombre completo del usuario o razón social si es una empresa. */
-    @Column(nullable = false, unique = true)
+    @Column(nullable = false, length = Config.MAX_LONGITUD_NOMBRE)
     private String nombre;
 
+    /** Apellidos del usuario (en una empresa, de la persona de contacto). */
+    @Column(nullable = false, length = Config.MAX_LONGITUD_APELLIDOS)
+    private String apellidos;
+
     /** Teléfono de contacto. */
+    @Column(length = Config.MAX_LONGITUD_TELEFONO, nullable = false)
     private String telefono;
-
-    /** URL de la imagen de perfil, común a todos los tipos de usuario. */
-    @Column(name = "imagen_perfil_url")
-    private String imagenPerfilUrl;
+    
 
     /**
-     * Latitud de la ubicación en grados (WGS84), o {@code null} si no la ha
-     * indicado.
+     * Clave del objeto de la imagen de perfil en el almacenamiento (R2).
+     * No es una URL: la URL firmada la genera {@code StorageService} en cada
+     * petición.
      */
-    private Double latitud;
-
-    /**
-     * Longitud de la ubicación en grados (WGS84), o {@code null} si no la ha
-     * indicado.
-     */
-    private Double longitud;
+    @Column(name = "clave_imagen_perfil", length = Config.MAX_LONGITUD_CLAVE_IMG)
+    private String claveImagenPerfil;
 
     /** Rol del usuario en la plataforma. */
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(nullable = false, length = Config.MAX_LONGITUD_ROL)
     private Rol rol;
 
-    /** Indica si la cuenta está activa. Una cuenta inactiva no puede acceder. */
+    /** Indica si la cuenta está activa. Una cuenta bloqueada no puede acceder. */
     @Column(nullable = false)
     private boolean activo = true;
 
@@ -76,6 +86,13 @@ public abstract class Usuario {
     @Column(name = "fecha_registro", nullable = false, updatable = false)
     private Instant fechaRegistro;
 
+    /**
+     * Cantidad de advertencias que tiene la cuenta. Si alcanza la cantidad de
+     * {@link Config#MAX_STRIKES} la cuenta queda inactiva
+     */
+    @Column(name = "cantidad_strikes", nullable = false)
+    private int strikes;
+
     // ========== CONSTRUCTORES ===========
 
     /**
@@ -88,25 +105,24 @@ public abstract class Usuario {
      * Crea un usuario con los datos obligatorios. Los demás campos se asignan
      * con sus setters o toman su valor por defecto.
      *
-     * @param email       correo electrónico, único en la plataforma
-     * @param contrasenia hash BCrypt de la contraseña, nunca la contraseña en claro
-     * @param nombre      nombre completo o razón social si es una empresa
-     * @param rol         rol del usuario, fijado por cada subclase
+     * @param email           correo electrónico, único en la plataforma
+     * @param hashContrasenia hash BCrypt de la contraseña, nunca la contraseña en
+     *                        claro
+     * @param nombre          nombre de pila
+     * @param apellidos       apellidos
+     * @param rol             rol del usuario, fijado por cada subclase
      */
-    protected Usuario(String email, String contrasenia, String nombre, Rol rol) {
-        this.email = email;
-        this.contrasenia = contrasenia;
+    protected Usuario(String email, String hashContrasenia, String nombre, String apellidos, Rol rol, String telefono) {
+        this.email = EmailUtil.normalizar(email);
+        this.hashContrasenia = hashContrasenia;
         this.nombre = nombre;
+        this.apellidos = apellidos;
         this.rol = rol;
+        this.telefono = telefono;
+        this.strikes = 0;
     }
 
-    // ============= MÉTODOS =============
-
-    /** Asigna la fecha de registro justo antes de guardar por primera vez. */
-    @PrePersist
-    void alCrear() {
-        this.fechaRegistro = Instant.now();
-    }
+    // ============= GETTERS & SETTERS =============
 
     /** @return identificador único del usuario */
     public Long getId() {
@@ -120,31 +136,37 @@ public abstract class Usuario {
 
     /** @param email correo electrónico, único en la plataforma */
     public void setEmail(String email) {
-        this.email = email;
+        this.email = EmailUtil.normalizar(email);
     }
 
-    /** @return hash de la contraseña */
-    public String getContrasenia() {
-        return contrasenia;
+    /** @return hash BCrypt de la contraseña */
+    public String getHashContrasenia() {
+        return hashContrasenia;
     }
 
-    /**
-     * @param contrasenia hash BCrypt de la contraseña, nunca la contraseña en claro
-     */
-    public void setContrasenia(String contrasenia) {
-        this.contrasenia = contrasenia;
+    /** @param hashContrasenia hash BCrypt, nunca la contraseña en claro */
+    public void setHashContrasenia(String hashContrasenia) {
+        this.hashContrasenia = hashContrasenia;
     }
 
-    /** @return nombre completo o razón social */
+    /** @return nombre de pila */
     public String getNombre() {
         return nombre;
     }
 
-    /**
-     * @param nombre nombre completo del usuario o razón social si es una empresa
-     */
+    /** @param nombre nombre de pila */
     public void setNombre(String nombre) {
         this.nombre = nombre;
+    }
+
+    /** @return apellidos */
+    public String getApellidos() {
+        return apellidos;
+    }
+
+    /** @param apellidos apellidos */
+    public void setApellidos(String apellidos) {
+        this.apellidos = apellidos;
     }
 
     /** @return teléfono de contacto, o {@code null} si no lo ha indicado */
@@ -157,34 +179,17 @@ public abstract class Usuario {
         this.telefono = telefono;
     }
 
-    /** @return URL de la imagen de perfil, o {@code null} si no tiene */
-    public String getImagenPerfilUrl() {
-        return imagenPerfilUrl;
+    /**
+     * @return clave de la imagen de perfil en el almacenamiento, o {@code null} si
+     *         no tiene
+     */
+    public String getClaveImagenPerfil() {
+        return claveImagenPerfil;
     }
 
-    /** @param imagenPerfilUrl URL de la imagen de perfil */
-    public void setImagenPerfilUrl(String imagenPerfilUrl) {
-        this.imagenPerfilUrl = imagenPerfilUrl;
-    }
-
-    /** @return latitud en grados, o {@code null} si no tiene ubicación */
-    public Double getLatitud() {
-        return latitud;
-    }
-
-    /** @param latitud latitud en grados, entre -90 y 90 */
-    public void setLatitud(Double latitud) {
-        this.latitud = latitud;
-    }
-
-    /** @return longitud en grados, o {@code null} si no tiene ubicación */
-    public Double getLongitud() {
-        return longitud;
-    }
-
-    /** @param longitud longitud en grados, entre -180 y 180 */
-    public void setLongitud(Double longitud) {
-        this.longitud = longitud;
+    /** @param claveImagenPerfil clave del objeto en el almacenamiento */
+    public void setClaveImagenPerfil(String claveImagenPerfil) {
+        this.claveImagenPerfil = claveImagenPerfil;
     }
 
     /** @return rol del usuario */
@@ -199,7 +204,7 @@ public abstract class Usuario {
 
     /**
      * @param activo {@code true} para activar la cuenta, {@code false} para
-     *               desactivarla
+     *               bloquearla
      */
     public void setActivo(boolean activo) {
         this.activo = activo;
@@ -219,4 +224,33 @@ public abstract class Usuario {
     public Instant getFechaRegistro() {
         return fechaRegistro;
     }
+
+    /** @return Cantidad de advertencias que tiene la cuenta */
+    public int getStrikes() {
+        return strikes;
+    }
+
+    // =========== MÉTODOS ===============
+    /** Asigna la fecha de registro justo antes de guardar por primera vez. */
+    @PrePersist
+    private void alCrear() {
+        this.fechaRegistro = Instant.now();
+    }
+
+    /** Añade 1 strike y si supera a {@link Config#MAX_STRIKES} se pone la cuenta en inactivo */
+    public void aniadirStrike(){
+        if ((this.strikes + 1) >= Config.MAX_STRIKES) {
+            setActivo(false);
+            this.strikes = Config.MAX_STRIKES;
+        } else {
+            this.strikes += 1;
+        }
+    }
+    /** Resta 1 strike solo si es > {@code 0} */
+    public void quitarStrike(){
+        if (this.strikes > 0) {
+            this.strikes -= 1;
+        }
+    }
+
 }

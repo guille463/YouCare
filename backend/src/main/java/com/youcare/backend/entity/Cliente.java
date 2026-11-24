@@ -1,12 +1,13 @@
 package com.youcare.backend.entity;
 
-import jakarta.persistence.*;
 import java.time.LocalDate;
-import java.time.Period;
 
 import com.youcare.backend.config.Config;
 import com.youcare.backend.entity.enums.Rol;
-import com.youcare.backend.exception.EdadMinimaException;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Table;
 
 /**
  * Usuario que contrata servicios de cuidados para sí mismo o para un familiar.
@@ -26,9 +27,11 @@ public class Cliente extends Usuario {
     private LocalDate fechaNacimiento;
 
     /** Dirección del cliente. */
+    @Column(length = Config.MAX_LONGITUD_DIRECCION)
     private String direccion;
 
     /** Ciudad de residencia. */
+    @Column(length = Config.MAX_LONGITUD_CIUDAD)
     private String ciudad;
 
     // ========== CONSTRUCTORES ===========
@@ -49,8 +52,9 @@ public class Cliente extends Usuario {
      * @param nombre          nombre completo del cliente
      * @param fechaNacimiento fecha de nacimiento del cliente
      */
-    public Cliente(String email, String contrasenia, String nombre, LocalDate fechaNacimiento) {
-        super(email, contrasenia, nombre, Rol.CLIENTE);
+    public Cliente(String email, String contrasenia, String nombre, String apellidos, LocalDate fechaNacimiento,
+            String telefono) {
+        super(email, contrasenia, nombre, apellidos, Rol.CLIENTE, telefono);
         this.fechaNacimiento = fechaNacimiento;
     }
 
@@ -65,7 +69,6 @@ public class Cliente extends Usuario {
      * @param fechaNacimiento fecha de nacimiento; el cliente debe ser mayor de edad
      */
     public void setFechaNacimiento(LocalDate fechaNacimiento) {
-        validarMayorDeEdad(fechaNacimiento);
         this.fechaNacimiento = fechaNacimiento;
     }
 
@@ -89,21 +92,4 @@ public class Cliente extends Usuario {
         this.ciudad = ciudad;
     }
 
-    // ============= MÉTODOS ==========
-    /**
-     * Comprueba que la fecha existe y que el cliente alcanza la edad mínima.
-     *
-     * @param fechaNacimiento fecha a comprobar
-     * @throws IllegalArgumentException si la fecha es {@code null}
-     * @throws EdadMinimaException      si el cliente no alcanza la edad mínima
-     */
-    private static void validarMayorDeEdad(LocalDate fechaNacimiento) {
-        if (fechaNacimiento == null) {
-            throw new IllegalArgumentException("La fecha de nacimiento es obligatoria");
-        }
-        int edad = Period.between(fechaNacimiento, LocalDate.now()).getYears();
-        if (edad < Config.EDAD_MINIMA_REGISTRO) {
-            throw new EdadMinimaException();
-        }
-    }
 }
