@@ -1,10 +1,12 @@
 package com.youcare.backend.entity.embeddable;
 
 import java.time.Instant;
+
 import com.youcare.backend.config.Config;
 import com.youcare.backend.entity.enums.EstadoDocumento;
 import com.youcare.backend.entity.enums.TipoDocumento;
 import com.youcare.backend.exception.ValidacionException;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Embeddable;
 import jakarta.persistence.EnumType;
@@ -73,24 +75,18 @@ public class Documento {
         this.motivoRechazo = null;
     }
 
-    /**
-     * Marca el documento como no válido. El usuario deberá subirlo de nuevo.
-     *
-     * @param motivo la explicación del rechazo es obligatoria
-     * @throws ValidacionException Manda excepción si falta el motivo o si supera el
-     *                             máximo de longitud.
-     */
-    public void rechazar(String motivo) {
+       public void rechazar(String motivo) {
         if (motivo == null || motivo.isBlank()) {
             throw new ValidacionException("motivoRechazo", "Falta indicar el motivo del rechazo");
         }
 
-        if (motivo.length() > Config.MAX_LONGITUD_MOTIVO_RECHAZO) {
+        String motivoLimpio = motivo.trim();
+        if (motivoLimpio.length() > Config.MAX_LONGITUD_MOTIVO_RECHAZO) {
             throw new ValidacionException("motivoRechazo",
                     "No se debe superar la longitud de " + Config.MAX_LONGITUD_MOTIVO_RECHAZO);
         }
         this.estado = EstadoDocumento.RECHAZADO;
-        this.motivoRechazo = motivo.trim();
+        this.motivoRechazo = motivoLimpio;
     }
 
     // ============= GETTERS =============
