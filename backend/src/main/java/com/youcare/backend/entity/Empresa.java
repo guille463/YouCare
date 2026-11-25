@@ -108,10 +108,6 @@ public class Empresa extends Usuario {
         return estadoVerificacion;
     }
 
-    /** @param estadoVerificacion nuevo estado (decisión del administrador) */
-    public void setEstadoVerificacion(EstadoVerificacion estadoVerificacion) {
-        this.estadoVerificacion = estadoVerificacion;
-    }
 
     /** @return documentos subidos (lista de solo lectura) */
     public List<Documento> getDocumentos() {

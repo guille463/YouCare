@@ -118,20 +118,7 @@ public class Cuidador extends Usuario {
         return estadoEnEmpresa;
     }
 
-    /**
-     * @param estadoEnEmpresa nuevo estado; solo se puede cambiar si pertenece a una
-     *                        empresa
-     */
-    public void setEstadoEnEmpresa(EstadoEnEmpresa estadoEnEmpresa) {
-        if (this.empresa == null) {
-            throw new ValidacionException("estadoEnEmpresa", "Un cuidador autónomo no tiene estado en ninguna empresa");
-        }
-        if (estadoEnEmpresa == null) {
-            throw new ValidacionException("estadoEnEmpresa", "El estado en la empresa es obligatorio si tiene estado");
-        }
-        this.estadoEnEmpresa = estadoEnEmpresa;
-    }
-
+    
     /** @return estado de verificación */
     public EstadoVerificacion getEstadoVerificacion() {
         return estadoVerificacion;
@@ -238,6 +225,9 @@ public class Cuidador extends Usuario {
      *               mismo día
      */
     public void aniadirFranja(FranjaHoraria franja) {
+        if (franja == null){
+            throw new ValidacionException("disponibilidad","La franja es obligatoria");
+        }
         for (FranjaHoraria existente : disponibilidad) {
             if (existente.seSolapan(franja)) {
                 throw new ValidacionException("disponibilidad", "La franja se solapa con otra ya existente");

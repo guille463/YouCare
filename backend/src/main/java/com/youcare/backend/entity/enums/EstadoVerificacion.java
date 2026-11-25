@@ -23,5 +23,5 @@ public enum EstadoVerificacion {
     /**
      * La verificacion ha sido denegada. No aparece en las busquedas
      */
-    RECHAZADO,
+    RECHAZADO
 }
