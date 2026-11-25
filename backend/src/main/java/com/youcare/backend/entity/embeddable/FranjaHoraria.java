@@ -2,8 +2,11 @@ package com.youcare.backend.entity.embeddable;
 
 import java.time.DayOfWeek;
 import java.time.LocalTime;
+import java.util.Objects;
+
 import com.youcare.backend.config.Config;
 import com.youcare.backend.exception.ValidacionException;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Embeddable;
 import jakarta.persistence.EnumType;
@@ -83,4 +86,26 @@ public class FranjaHoraria {
     public LocalTime getHoraFin() {
         return horaFin;
     }
+
+          // ============= EQUALS & HASHCODE =============
+
+    /** Dos franjas son iguales si tienen el mismo día y las mismas horas. */
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (!(o instanceof FranjaHoraria otra)) {
+            return false;
+        }
+        return diaSemana == otra.diaSemana
+                && Objects.equals(horaInicio, otra.horaInicio)
+                && Objects.equals(horaFin, otra.horaFin);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(diaSemana, horaInicio, horaFin);
+    }
+    
 }
