@@ -1,12 +1,18 @@
 package com.youcare.backend.entity;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+
 import com.youcare.backend.config.Config;
 import com.youcare.backend.entity.embeddable.Documento;
+import com.youcare.backend.entity.enums.EstadoDocumento;
 import com.youcare.backend.entity.enums.EstadoVerificacion;
 import com.youcare.backend.entity.enums.Rol;
 import com.youcare.backend.entity.enums.TipoDocumento;
+import com.youcare.backend.exception.ValidacionException;
+import com.youcare.backend.util.IdentificadorUtil;
+
 import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
 import jakarta.persistence.ElementCollection;
@@ -71,7 +77,7 @@ public class Empresa extends Usuario {
             String cif, String telefono) {
         super(email, hashContrasenia, nombre, apellidos, Rol.EMPRESA, telefono);
         this.razonSocial = razonSocial;
-        this.cif = cif;
+        this.cif = IdentificadorUtil.normalizar(cif);
         this.estadoVerificacion = EstadoVerificacion.SIN_SUBIR;
     }
 
@@ -94,7 +100,7 @@ public class Empresa extends Usuario {
 
     /** @param cif CIF de la empresa, único */
     public void setCif(String cif) {
-        this.cif = cif;
+        this.cif = IdentificadorUtil.normalizar(cif);
     }
 
     /** @return estado de verificación */
@@ -109,18 +115,61 @@ public class Empresa extends Usuario {
 
     /** @return documentos subidos (lista de solo lectura) */
     public List<Documento> getDocumentos() {
-        return documentos;
+        return Collections.unmodifiableList(documentos);
     }
 
     // =========== MÉTODOS ===============
 
     /** @param documento documento recién subido */
     public void aniadirDocumento(Documento documento) {
+        if (documento == null) {
+            throw new ValidacionException("documento", "El documento es obligatorio");
+        }
+        if (documento.getTipo() == TipoDocumento.CERTIFICADO_PROFESIONAL) {
+            throw new ValidacionException("tipo",
+                    "Los certificados profesionales los sube cada cuidador, no la empresa");
+        }
         this.documentos.add(documento);
         // Si estaba rechazado o sin subir, se pone a pendiente
         if (documento.getTipo() == TipoDocumento.CIF && (this.estadoVerificacion == EstadoVerificacion.SIN_SUBIR
                 || this.estadoVerificacion == EstadoVerificacion.RECHAZADO)) {
             this.estadoVerificacion = EstadoVerificacion.PENDIENTE;
         }
+    }
+
+    /**
+     * El administrador verifica la empresa.
+     *
+     * @throws ValidacionException si la cuenta no está pendiente de revisión o
+     *                             no tiene un CIF aprobado
+     */
+    public void verificar() {
+        if (this.estadoVerificacion != EstadoVerificacion.PENDIENTE) {
+            throw new ValidacionException("estadoVerificacion",
+                    "Solo se puede verificar una cuenta pendiente de revisión");
+        }
+        boolean cifAprobado = documentos.stream()
+                .anyMatch(d -> d.getTipo() == TipoDocumento.CIF
+                        && d.getEstado() == EstadoDocumento.APROBADO);
+        if (!cifAprobado) {
+            throw new ValidacionException("documentos",
+                    "No se puede verificar sin un CIF aprobado");
+        }
+        this.estadoVerificacion = EstadoVerificacion.VERIFICADO;
+    }
+
+    /**
+     * El administrador rechaza la verificación. El motivo concreto va en el
+     * documento rechazado. La empresa vuelve a {@code PENDIENTE} cuando sube un
+     * nuevo CIF.
+     *
+     * @throws ValidacionException si la cuenta no está pendiente de revisión
+     */
+    public void rechazarVerificacion() {
+        if (this.estadoVerificacion != EstadoVerificacion.PENDIENTE) {
+            throw new ValidacionException("estadoVerificacion",
+                    "Solo se puede rechazar una cuenta pendiente de revisión");
+        }
+        this.estadoVerificacion = EstadoVerificacion.RECHAZADO;
     }
 }

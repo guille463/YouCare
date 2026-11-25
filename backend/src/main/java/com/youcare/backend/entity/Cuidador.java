@@ -3,13 +3,18 @@ package com.youcare.backend.entity;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+
 import com.youcare.backend.config.Config;
 import com.youcare.backend.entity.embeddable.Documento;
 import com.youcare.backend.entity.embeddable.FranjaHoraria;
+import com.youcare.backend.entity.enums.EstadoDocumento;
 import com.youcare.backend.entity.enums.EstadoEnEmpresa;
 import com.youcare.backend.entity.enums.EstadoVerificacion;
 import com.youcare.backend.entity.enums.Rol;
+import com.youcare.backend.entity.enums.TipoDocumento;
 import com.youcare.backend.exception.ValidacionException;
+import com.youcare.backend.util.IdentificadorUtil;
+
 import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
 import jakarta.persistence.ElementCollection;
@@ -85,7 +90,7 @@ public class Cuidador extends Usuario {
     public Cuidador(String email, String hashContrasenia, String nombre, String apellidos, String dniNie,
             String telefono) {
         super(email, hashContrasenia, nombre, apellidos, Rol.CUIDADOR, telefono);
-        this.dniNie = dniNie;
+        this.dniNie = IdentificadorUtil.normalizar(dniNie) ;
         this.estadoVerificacion = EstadoVerificacion.SIN_SUBIR;
     }
 
@@ -98,7 +103,7 @@ public class Cuidador extends Usuario {
 
     /** @param dniNie DNI o NIE, único */
     public void setDniNie(String dniNie) {
-        this.dniNie = dniNie;
+        this.dniNie = IdentificadorUtil.normalizar(dniNie);
     }
 
     /** @return empresa a la que pertenece, o {@code null} si es autónomo */
@@ -128,14 +133,6 @@ public class Cuidador extends Usuario {
     /** @return estado de verificación */
     public EstadoVerificacion getEstadoVerificacion() {
         return estadoVerificacion;
-    }
-
-    /**
-     * @param estadoVerificacion nuevo estado de verificación (decisión del
-     *                           administrador)
-     */
-    public void setEstadoVerificacion(EstadoVerificacion estadoVerificacion) {
-        this.estadoVerificacion = estadoVerificacion;
     }
 
     /** @return documentos subidos (lista de solo lectura) */
@@ -170,16 +167,30 @@ public class Cuidador extends Usuario {
         this.estadoEnEmpresa = null;
     }
 
-    /**
-     * Añade un documento recién subido. Si la cuenta estaba sin documentos o
-     * rechazada, pasa a {@code PENDIENTE} para que el admin la vuelva a revisar.
+        /**
+     * Añade un documento recién subido.
+     * <p>
+     * Solo el {@code DNI_NIE} reactiva la verificación de la cuenta: si estaba
+     * {@code SIN_SUBIR} o {@code RECHAZADO}, pasa a {@code PENDIENTE}. Los demás
+     * documentos (certificados) se revisan uno a uno con su propio estado.
+     * </p>
      *
      * @param documento documento recién subido
+     * @throws ValidacionException si el documento es {@code null} o es un CIF
      */
     public void aniadirDocumento(Documento documento) {
+        if (documento == null) {
+            throw new ValidacionException("documento", "El documento es obligatorio");
+        }
+        if (documento.getTipo() == TipoDocumento.CIF) {
+            throw new ValidacionException("tipo", "Un cuidador no puede subir un CIF");
+        }
+
         this.documentos.add(documento);
-        if (this.estadoVerificacion == EstadoVerificacion.SIN_SUBIR
-                || this.estadoVerificacion == EstadoVerificacion.RECHAZADO) {
+
+        if (documento.getTipo() == TipoDocumento.DNI_NIE
+                && (this.estadoVerificacion == EstadoVerificacion.SIN_SUBIR
+                        || this.estadoVerificacion == EstadoVerificacion.RECHAZADO)) {
             this.estadoVerificacion = EstadoVerificacion.PENDIENTE;
         }
     }
@@ -195,5 +206,42 @@ public class Cuidador extends Usuario {
             }
         }
         this.disponibilidad.add(franja);
+    }
+
+        /**
+     * El administrador verifica la cuenta. Desde ese momento, el cuidador aparece
+     * en las búsquedas.
+     *
+     * @throws ValidacionException si la cuenta no está pendiente de revisión o
+     *                             no tiene un DNI/NIE aprobado
+     */
+    public void verificar() {
+        if (this.estadoVerificacion != EstadoVerificacion.PENDIENTE) {
+            throw new ValidacionException("estadoVerificacion",
+                    "Solo se puede verificar una cuenta pendiente de revisión");
+        }
+        boolean dniAprobado = documentos.stream()
+                .anyMatch(d -> d.getTipo() == TipoDocumento.DNI_NIE
+                        && d.getEstado() == EstadoDocumento.APROBADO);
+        if (!dniAprobado) {
+            throw new ValidacionException("documentos",
+                    "No se puede verificar sin un DNI/NIE aprobado");
+        }
+        this.estadoVerificacion = EstadoVerificacion.VERIFICADO;
+    }
+
+    /**
+     * El administrador rechaza la verificación. El motivo concreto va en el
+     * documento rechazado ({@link Documento#rechazar(String)}). El cuidador
+     * vuelve a {@code PENDIENTE} cuando sube un nuevo DNI/NIE.
+     *
+     * @throws ValidacionException si la cuenta no está pendiente de revisión
+     */
+    public void rechazarVerificacion() {
+        if (this.estadoVerificacion != EstadoVerificacion.PENDIENTE) {
+            throw new ValidacionException("estadoVerificacion",
+                    "Solo se puede rechazar una cuenta pendiente de revisión");
+        }
+        this.estadoVerificacion = EstadoVerificacion.RECHAZADO;
     }
 }
