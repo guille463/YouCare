@@ -340,12 +340,12 @@ Entidad `Admin`, constantes de validación y revisión completa del backend. Se 
 - Evita cuentas
 
 
-## 24/11/2026 
+## 24/11/2026
 
 ### Resumen
-La app vuelve a arrancar: Flyway aplica V1–V4 y Hibernate valida `Usuario`, `Cliente` y `Admin` sin errores. Además: configuración de producción con variables de entorno, `.gitignore` en la raíz y primer PR de `feature/backend-setup` a `develop`.
+La app vuelve a arrancar: Flyway aplica V1–V4 y Hibernate valida `Usuario`, `Cliente` y `Admin` sin errores. Por la mañana: configuración de producción, `.gitignore` en la raíz y primer PR (`feature/backend-setup` → `develop`). Por la tarde y la noche: enums de documentos y verificación, y las entidades `Cuidador`, `Empresa` y `PersonaCuidada` con sus migraciones (rama `feature/backend-entidad-cuidador`).
 
-### Qué he hecho
+### Qué hemos hecho
 
 **1. V2 restaurada a su versión original**
 - V2 estaba editada en el repo, con un `CONSTRAINT CHECK` sin nombre (sintaxis inválida).
@@ -353,19 +353,18 @@ La app vuelve a arrancar: Flyway aplica V1–V4 y Hibernate valida `Usuario`, `C
 - **Regla:** un archivo `V` que ya está en el repo no se edita. Flyway guarda su checksum, y cualquier cambio da `checksum mismatch`.
 
 **2. `V3__ajustar_usuario.sql`**
-- `cantidad_strikes INT NOT NULL DEFAULT 0` + `ck_usuario_strikes CHECK (>= 0)`.
-  - El máximo (3) no va en el `CHECK`, porque ya está en `Config.MAX_STRIKES`.
+- `cantidad_strikes INT NOT NULL DEFAULT 0` + `ck_usuario_strikes CHECK (>= 0)`. El máximo (3) está solo en `Config.MAX_STRIKES`.
 - `telefono SET NOT NULL`.
 - `ck_usuario_email_minusculas CHECK (email = lower(email))`: refuerza en la BD la normalización de `EmailUtil`.
 
 **3. `V4__crear_cliente_y_admin.sql`**
-- Tablas `cliente` y `admin`: su `id` es PK y a la vez FK hacia `usuario(id)`, con `ON DELETE CASCADE`.
+- Tablas `cliente` y `admin`: el `id` es PK y FK hacia `usuario(id)`, con `ON DELETE CASCADE`.
 - El `id` de las hijas no es `IDENTITY`: lo genera `usuario`.
 - `fecha_nacimiento DATE NOT NULL`. La edad mínima se valida en Java, porque un `CHECK` con `now()` no es fiable.
 
 **4. Longitudes en `Cliente`**
-- Nuevas constantes `MAX_LONGITUD_DIRECCION = 200` y `MAX_LONGITUD_CIUDAD = 100`, usadas en las `@Column`.
-- **Criterio para `name` en `@Column`:** solo cuando la columna se llama distinto al atributo (`strikes` → `cantidad_strikes`). En el resto, Spring Boot ya convierte camelCase a snake_case.
+- `MAX_LONGITUD_DIRECCION = 200` y `MAX_LONGITUD_CIUDAD = 100`, usadas en las `@Column`.
+- `name` en `@Column` solo cuando la columna se llama distinto al atributo (`strikes` → `cantidad_strikes`).
 
 **5. `.gitignore` en la raíz**
 - Secretos (`.env`, `.env.*`, excepto `.env.example`), `node_modules/`, Expo, claves de firma (`.jks`, `.p12`…), builds, IDEs, sistema operativo y logs.
@@ -375,4 +374,114 @@ La app vuelve a arrancar: Flyway aplica V1–V4 y Hibernate valida `Usuario`, `C
 - `ddl-auto=validate` pasa a `application.properties`, porque vale para todos los perfiles.
 - `application-prod.properties`:
   - BD y correo con `${VARIABLE}`, sin valores por defecto: si falta una variable, la app no arranca.
-  - `server.port=${PORT:8080}`, porque Render asigna el
+  - `server.port=${PORT:8080}`, porque Render asigna el puerto en `PORT`.
+  - Actuator solo con `health`.
+- `backend/.env.example`: los nombres de las variables, sin valores reales.
+
+**7. Comprobaciones de la BD por terminal**
+- `Comprobaciones_BD_Terminal.md`: comandos y capturas para comprobar migraciones, tablas y restricciones con `psql`.
+
+**8. PR #1: `feature/backend-setup` → `develop`**
+- Revisado y fusionado por Jorge.
+
+**9. Enums de documentos y verificación** (Guillermo)
+- `TipoDocumento`: `DNI_NIE`, `CERTIFICADO_PROFESIONAL`, `CIF`, `OTRO`.
+- `EstadoDocumento`: `PENDIENTE`, `APROBADO`, `RECHAZADO`.
+- `EstadoVerificacion`: `SIN_SUBIR`, `PENDIENTE`, `VERIFICADO`, `RECHAZADO`.
+
+**10. Entidades `Cuidador`, `Empresa` y `PersonaCuidada`** (Jorge, de 23:00 a 00:55)
+- `EstadoEnEmpresa` (`PENDIENTE`, `ACTIVO`, `BAJA`) y constantes nuevas en `Config`.
+- Errata corregida: `TipoDoucmento` → `TipoDocumento`.
+- Embebibles:
+  - `Documento`: tipo, estado, clave del archivo, motivo de rechazo y fecha de subida.
+  - `FranjaHoraria`: día, hora de inicio y hora de fin, con detección de solapamientos.
+- `Cuidador` y `Empresa` heredan de `Usuario` (`JOINED`). `PersonaCuidada` es una entidad independiente, a cargo de un `Cliente`.
+- Migraciones:
+  - `V6__crear_empresa.sql`
+  - `V7__crear_cuidador.sql`
+  - `V8__crear_persona_cuidada.sql`
+  - No hay V5: Flyway admite huecos en la numeración.
+- Fix: subir cualquier documento pasaba la cuenta a `PENDIENTE`, no solo un certificado. Las listas de documentos y de franjas pasan a ser de solo lectura.
+
+### Problemas
+
+| Error | Causa | Solución |
+|---|---|---|
+| `syntax error at or near "CHECK"` en V2 | Se editó una migración ya aplicada | Restaurar V2 desde su commit; los cambios van en V3 |
+| `git checkout --` no arreglaba V2 | El V2 roto ya estaba commiteado | `git checkout <commit> -- archivo` |
+| `pathspec ... did not match any file` | Comando lanzado desde `backend/` con una ruta relativa a la raíz | Ejecutarlo desde la raíz |
+| `backend/target/` aparecía como *untracked* | Se pegó el `.gitignore` raíz encima de `backend/.gitignore` | `git restore` y crear el archivo en la raíz |
+| `prod`: `Could not resolve placeholder 'MAIL_HOST'` | **Esperado:** en local no hay variables de entorno | — (demuestra que no hay credenciales en el código) |
+
+---
+
+## 25/11/2026
+
+### Resumen
+Revisión de la rama `feature/backend-entidad-cuidador` y corrección de los errores encontrados, paso a paso y con tests. Primeros tests unitarios del proyecto: **45 en verde**, incluido el arranque completo con `validate` contra la BD.
+
+### Qué hemos hecho
+
+**1. Normalizar DNI/NIE y CIF**
+- Nueva clase `util/IdentificadorUtil.normalizar()`: quita espacios y guiones y pasa a mayúsculas con `Locale.ROOT`.
+- Se usa en el constructor y en el setter de `dniNie` (`Cuidador`) y de `cif` (`Empresa`).
+- Antes, `12345678z` o `12345678-Z` chocaban con el `CHECK` de la BD y la API daba un error 500.
+
+**2. Mismas reglas de documentos en `Cuidador` y `Empresa`**
+- Solo el documento de identidad reactiva la verificación: `DNI_NIE` en el cuidador y `CIF` en la empresa.
+- Tipos prohibidos: un cuidador no puede subir un `CIF`; una empresa no puede subir un `CERTIFICADO_PROFESIONAL`.
+- Primero se valida y después se añade: si algo falla, la lista no cambia.
+- `Empresa.getDocumentos()` pasa a ser de solo lectura.
+
+**3. `verificar()` y `rechazarVerificacion()`**
+- Sustituyen a `setEstadoVerificacion` en `Cuidador` y en `Empresa`.
+- Solo actúan si la cuenta está en `PENDIENTE`.
+- `verificar()` exige un documento de identidad en estado `APROBADO`. Sin DNI aprobado, el cuidador no aparece en las búsquedas (DSA, art. 30).
+
+**4. `Documento.rechazar()`**
+- La longitud del motivo se comprueba después del `trim()`: se mide lo mismo que se guarda.
+
+**5. Transiciones del cuidador en la empresa**
+- `setEstadoEnEmpresa` se sustituye por `vincularAEmpresa()`, `aceptarEnEmpresa()`, `darDeBajaEnEmpresa()` y `desvincularDeEmpresa()`.
+- Para vincularse, la empresa tiene que estar verificada y el cuidador no puede estar activo en otra.
+- `BAJA` conserva la empresa como historial.
+
+**6. `disponibilidad` como `Set`**
+- `equals`/`hashCode` en `FranjaHoraria`.
+- Dos `List` en `@ElementCollection` son dos *bags*, y cargarlas juntas da `MultipleBagFetchException`. Con una basta para evitarlo.
+- `Documento` sigue en `List`: cambia de estado y tiene una columna que admite `NULL`.
+- Sin migración: la tabla no cambia.
+
+**7. Tests unitarios** (JUnit, sin Spring)
+
+| Clase | Tests |
+|---|---|
+| `CuidadorTest` | 23 |
+| `EmpresaTest` | 8 |
+| `DocumentoTest` | 6 |
+| `FranjaHorariaTest` | 7 |
+
+- Patrón *Arrange, Act, Assert* y `@BeforeEach` para que cada test empiece con un objeto nuevo.
+- `BackendApplicationTests` (con Docker levantado): Flyway aplica V6–V8 y `validate` confirma que entidades y tablas coinciden.
+
+**8. Commits separados por tipo de cambio**
+- `fix`, `refactor` y `test` por separado.
+- Con `git add -p` se separaron dos cambios distintos hechos en el mismo archivo (`Cuidador.java`).
+
+### Problemas
+
+| Error | Causa | Solución |
+|---|---|---|
+| `release version 25 not supported` | `~/.bashrc` fijaba `JAVA_HOME` al JDK 21 y pisaba la variable de Windows | Apuntar `JAVA_HOME` al JDK 25 en `.bashrc` (`./mvnw -v` debe decir 25) |
+| `Nothing to compile` sin haber compilado | VS Code compila en la misma carpeta `target/classes`, o el archivo no estaba guardado | `git diff --stat` y `./mvnw clean compile` |
+| El `grep` seguía encontrando un método ya borrado | El archivo no se había guardado en disco | Borrarlo con `sed -i` y comprobarlo con `sed -n` |
+| `desvincularDeEmpresa() is undefined` | Se borró al sustituir el método de encima | Volver a añadirlo |
+| `unmodifiableList` con un `Set` | Se cambió el atributo pero no el getter | `unmodifiableSet` y tipo de retorno `Set` |
+| `Connection to localhost:5433 refused` | El contenedor de la BD no estaba levantado | `docker compose up -d` desde la raíz |
+
+### Pendiente
+- [ ] Javadoc de `Usuario` y `Cliente`: razón social, ubicación, `@param` que faltan y `contrasenia` → `hashContrasenia`.
+- [ ] Borrar `feature/backend-entidad-usuario` sin fusionarla, después de confirmarlo con el equipo.
+- [ ] Avisar al equipo de que el proyecto necesita JDK 25 y ponerlo en el README.
+- [ ] Abrir el PR de `feature/backend-entidad-cuidador` → `develop`.
+- [ ] Sprint 3: ubicación (`geography(Point, 4326)` + GiST), tarifa y descripción en `Cuidador`; dependencia `hibernate-spatial`. La siguiente migración es V9.
