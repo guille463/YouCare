@@ -2,7 +2,9 @@ package com.youcare.backend.entity;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import com.youcare.backend.config.Config;
 import com.youcare.backend.entity.embeddable.Documento;
@@ -66,7 +68,7 @@ public class Cuidador extends Usuario {
     /** Franjas semanales en las que está disponible. */
     @ElementCollection
     @CollectionTable(name = "cuidador_franja_horaria", joinColumns = @JoinColumn(name = "cuidador_id"))
-    private List<FranjaHoraria> disponibilidad = new ArrayList<>();
+       private Set<FranjaHoraria> disponibilidad = new HashSet<>();
 
     // ========== CONSTRUCTORES ===========
 
@@ -140,28 +142,64 @@ public class Cuidador extends Usuario {
         return Collections.unmodifiableList(documentos);
     }
 
-    /** @return franjas de disponibilidad (lista de solo lectura) */
-    public List<FranjaHoraria> getDisponibilidad() {
-        return Collections.unmodifiableList(disponibilidad);
+        /** @return franjas de disponibilidad (conjunto de solo lectura) */
+    public Set<FranjaHoraria> getDisponibilidad() {
+        return Collections.unmodifiableSet(disponibilidad);
     }
 
     // =========== MÉTODOS ===============
 
-    /**
-     * Vincula al cuidador con una empresa. Queda en estado {@code PENDIENTE}
-     * hasta que la empresa lo acepte.
+       /**
+     * Solicita unirse a una empresa. Queda en {@code PENDIENTE} hasta que la
+     * empresa lo acepte.
      *
      * @param empresa empresa a la que se une
+     * @throws ValidacionException si la empresa es {@code null}, no está
+     *                             verificada o el cuidador ya pertenece a otra
      */
     public void vincularAEmpresa(Empresa empresa) {
         if (empresa == null) {
             throw new ValidacionException("empresa", "La empresa es obligatoria");
         }
+        if (empresa.getEstadoVerificacion() != EstadoVerificacion.VERIFICADO) {
+            throw new ValidacionException("empresa", "La empresa no está verificada");
+        }
+        if (this.empresa != null && this.estadoEnEmpresa != EstadoEnEmpresa.BAJA) {
+            throw new ValidacionException("empresa",
+                    "Ya pertenece a una empresa; primero debe darse de baja");
+        }
         this.empresa = empresa;
         this.estadoEnEmpresa = EstadoEnEmpresa.PENDIENTE;
     }
 
-    /** Convierte al cuidador en autónomo, borra la empresa y su estado en ella. */
+        /**
+     * La empresa acepta al cuidador.
+     *
+     * @throws ValidacionException si no tiene una solicitud pendiente
+     */
+    public void aceptarEnEmpresa() {
+        if (this.estadoEnEmpresa != EstadoEnEmpresa.PENDIENTE) {
+            throw new ValidacionException("estadoEnEmpresa",
+                    "Solo se puede aceptar una solicitud pendiente");
+        }
+        this.estadoEnEmpresa = EstadoEnEmpresa.ACTIVO;
+    }
+
+    /**
+     * Baja en la empresa (la pide el cuidador o la decide la empresa). Se
+     * conserva la empresa para saber dónde estuvo.
+     *
+     * @throws ValidacionException si es autónomo o ya estaba de baja
+     */
+    public void darDeBajaEnEmpresa() {
+        if (this.estadoEnEmpresa == null || this.estadoEnEmpresa == EstadoEnEmpresa.BAJA) {
+            throw new ValidacionException("estadoEnEmpresa",
+                    "No pertenece a ninguna empresa activa");
+        }
+        this.estadoEnEmpresa = EstadoEnEmpresa.BAJA;
+    }
+
+        /** Convierte al cuidador en autónomo: borra la empresa y su estado en ella. */
     public void desvincularDeEmpresa() {
         this.empresa = null;
         this.estadoEnEmpresa = null;
