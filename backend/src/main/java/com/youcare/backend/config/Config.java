@@ -104,4 +104,13 @@ public final class Config {
     // ========= EMPRESA ============
     public static final int MAX_LONGITUD_RAZON_SOCIAL = 150;
     public static final int MAX_LONGITUD_CIF = 9;
+
+    // ========= CHAT ============
+    public static final int MAX_LONGITUD_CONTENIDO_MENSAJE = 2000;
+
+    // ========= TOKENS ============
+    /** SHA-256 en hexadecimal */
+    public static final int LONGITUD_HASH_TOKEN = 64;
+    public static final int DIAS_VALIDEZ_REFRESH_TOKEN = 7;
+    public static final int MAX_LONGITUD_TIPO_EMAIL_TOKEN = 20;
 }
