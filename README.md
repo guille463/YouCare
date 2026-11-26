@@ -485,3 +485,88 @@ Revisión de la rama `feature/backend-entidad-cuidador` y corrección de los err
 - [ ] Avisar al equipo de que el proyecto necesita JDK 25 y ponerlo en el README.
 - [ ] Abrir el PR de `feature/backend-entidad-cuidador` → `develop`.
 - [ ] Sprint 3: ubicación (`geography(Point, 4326)` + GiST), tarifa y descripción en `Cuidador`; dependencia `hibernate-spatial`. La siguiente migración es V9.
+
+---
+
+## 26/11/2026
+
+### Resumen
+Rama `feature/backend-chat-tokens`: entidades `Chat`, `Mensaje`, `RefreshToken` y `EmailToken`, con sus migraciones V12–V15. La app arranca: Flyway aplica las 4 migraciones y Hibernate valida las entidades sin errores. Las restricciones se comprueban con un script SQL y la lógica Java con 53 tests unitarios nuevos (97 en total).
+
+### Antes (tarde del 25/11)
+- Dependencias en el `pom`: `hibernate-spatial`, para la búsqueda por distancia del Sprint 3, y `springdoc-openapi`, para Swagger.
+- Refactor: se eliminan `setEstadoEmpresa` (`Cuidador`) y `estadoVerificacion` duplicado (`Empresa`), y se corrige una coma de más en `EstadoVerificacion`.
+- PR #2 `feature/backend-entidad-cuidador` → `develop`, revisado y fusionado por Jorge.
+- Reparto de las entidades que faltan en dos ramas independientes:
+
+| Rama | Entidades | Migraciones |
+|---|---|---|
+| `feature/backend-reservas` | `Reserva`, `Pago`, `Resena` | V9–V11 |
+| `feature/backend-chat-tokens` | `Chat`, `Mensaje`, `RefreshToken`, `EmailToken` | V12–V15 |
+
+- **Orden de merge:** primero reservas y después chat-tokens. Si se fusiona al revés, Flyway encuentra V9–V11 por debajo de V15 ya aplicada y falla (`Detected resolved migration not applied`).
+
+### Qué hemos hecho
+
+**1. `Chat`** (`V12__crear_chat.sql`)
+- No depende de las reservas: el cliente puede preguntar antes de reservar o sin llegar a reservar.
+- **Con quién habla el cliente:** con quien ofrece el servicio.
+  - Cuidador autónomo → con el `Cuidador`.
+  - Cuidador `ACTIVO` en una empresa → con la `Empresa`.
+  - Si está `PENDIENTE` o de `BAJA` en una empresa, sigue siendo autónomo.
+- Dos FK que admiten `NULL` (`cuidador_id`, `empresa_id`) y un `CHECK (num_nonnulls(cuidador_id, empresa_id) = 1)`: siempre hay exactamente un proveedor.
+- **Por qué no un solo `proveedor_id` → `usuario`:** un `CHECK` no puede consultar otra tabla, así que la BD no podría impedir un chat con un admin o entre dos clientes.
+- `UNIQUE (cliente_id, cuidador_id)` y `UNIQUE (cliente_id, empresa_id)`: un solo chat por pareja. PostgreSQL trata los `NULL` como distintos, así que cada `UNIQUE` solo actúa cuando su columna tiene valor.
+- No se usa constructor público. Se crea con `Chat.conCuidador(...)` o `Chat.conEmpresa(...)`, y así no se puede construir con los dos proveedores ni con ninguno.
+- `esParticipante(usuario)` compara por `id` y no con `equals`. Con `LAZY`, Hibernate puede devolver un proxy en lugar del objeto real.
+- Sin `@OneToMany List<Mensaje>`: los mensajes se cargarán paginados desde el repositorio, no el historial entero.
+- Se llama `Chat` (en el diseño se llamaba `Conversacion`). Hay que actualizar el modelo ER.
+
+**2. `Mensaje`** (`V13__crear_mensaje.sql`)
+- N:1 `Chat` y N:1 `Usuario` (emisor).
+- **El receptor no se guarda:** es el otro participante del chat.
+- `fechaLectura` en lugar de `visto` (boolean): si es `NULL`, no se ha leído, y además queda registrado cuándo se leyó.
+- El constructor valida que el emisor participa en el chat y que el contenido no está vacío ni supera 2000 caracteres. Se mide después de quitar los espacios de los extremos.
+- Índice `(chat_id, fecha_envio)`: carga el historial ya ordenado.
+
+**3. `RefreshToken`** (`V14__crear_refresh_token.sql`)
+- **Se guarda el hash SHA-256, nunca el token:** si se filtra la BD, los hashes no sirven para iniciar sesión.
+- **SHA-256 y no BCrypt:** hay que buscar el token por su hash, y BCrypt genera un hash distinto cada vez por la sal. El token es aleatorio y largo, así que no necesita un hash lento.
+- `fechaRevocacion` (si es `NULL`, el token está activo): sirve para el logout y para la rotación, que revoca el token en cada renovación y crea uno nuevo.
+- Caduca a los 7 días (`Config.DIAS_VALIDEZ_REFRESH_TOKEN`).
+
+**4. `EmailToken`** (`V15__crear_email_token.sql`)
+- Un solo uso: `marcarUsado()` lanza una excepción si ya se usó o ha caducado.
+- La caducidad depende del tipo: 24 h para `VERIFICACION` y 1 h para `RECUPERACION`.
+- Tabla separada de `refresh_token`, porque tiene `tipo` y es de un solo uso.
+
+**5. Restricciones en la BD**
+- `CHECK` de hash hexadecimal en minúsculas, de fechas (`expiracion > creacion`, `lectura >= envio`) y de contenido no vacío.
+- `ON DELETE CASCADE`: si se borra un usuario, se borran sus chats, mensajes y tokens.
+- Hash como `VARCHAR(64)` y no `CHAR(64)`: con `ddl-auto=validate`, Hibernate espera `varchar` para un `String` y con `CHAR` no arranca.
+
+**6. Constantes nuevas en `Config`**
+- `MAX_LONGITUD_CONTENIDO_MENSAJE = 2000`, `LONGITUD_HASH_TOKEN = 64`, `DIAS_VALIDEZ_REFRESH_TOKEN = 7` y `MAX_LONGITUD_TIPO_EMAIL_TOKEN = 20`.
+- Van en bloques propios al final del archivo (`CHAT`, `TOKENS`), para no chocar con la rama de reservas.
+
+**7. Comprobación en la BD**
+- Arranque: `Successfully applied 4 migrations ... now at version v15`, y después `Started BackendApplication`.
+- Script `backend/scripts/pruebas/prueba_chat_tokens.sql`: todos los `CHECK` y `UNIQUE` rechazan lo que deben, y el borrado en cascada deja la BD limpia (`0 | 0 | 0 | 0`).
+- Se ejecuta con: `docker compose exec -T db psql -U youcare -d youcare < scripts/pruebas/prueba_chat_tokens.sql` (desde `backend/`).
+
+**8. Tests unitarios** (JUnit, sin Spring ni BD)
+
+| Clase | Tests | Qué comprueba |
+|---|---|---|
+| `ChatTest` | 16 | Proveedor único, validaciones, cuidador activo/pendiente/de baja en empresa, participantes por `id` |
+| `MensajeTest` | 15 | Emisor participante, contenido vacío o demasiado largo, `trim`, lectura |
+| `RefreshTokenTest` | 11 | Caducidad a 7 días, límite exacto de expiración, revocación |
+| `EmailTokenTest` | 11 | Caducidad según el tipo, uso único, token caducado |
+
+- `EntidadesTestUtil`: crea cliente, cuidador y empresa verificada, y asigna el `id` con `ReflectionTestUtils`. Sin BD no hay `id`, y `esParticipante` daría siempre `false`.
+
+### Problemas
+
+| Error | Causa | Solución |
+|---|---|---|
+| `Mensaje.java` no compilaba | `@Column(nullable)`
