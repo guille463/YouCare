@@ -102,7 +102,7 @@ public class Mensaje {
         return id;
     }
 
-    public Chat getchat() {
+    public Chat getChat() {
         return chat;
     }
 
