@@ -575,7 +575,349 @@ docker compose exec db psql -U youcare -d youcare -c "SELECT count(*) FROM perso
 
 ---
 
-## 10. Limpiar los datos de prueba
+## 10. Datos para V12–V15
+
+Un cliente, un cuidador autónomo y una empresa, con datos propios para no depender de los apartados anteriores:
+
+```bash
+docker compose exec db psql -U youcare -d youcare -c "INSERT INTO usuario (email, hash_contrasenia, nombre, apellidos, telefono, rol) VALUES ('rosa@gmail.com', 'x', 'Rosa', 'López', '600000030', 'CLIENTE'), ('pablo@gmail.com', 'x', 'Pablo', 'Gil', '600000031', 'CUIDADOR'), ('info@cuidagranada.com', 'x', 'Elena', 'Mora', '958000030', 'EMPRESA')"
+docker compose exec db psql -U youcare -d youcare -c "INSERT INTO cliente (id, fecha_nacimiento) SELECT id, '1975-03-10' FROM usuario WHERE email = 'rosa@gmail.com'"
+docker compose exec db psql -U youcare -d youcare -c "INSERT INTO cuidador (id, dni_nie) SELECT id, '11111111H' FROM usuario WHERE email = 'pablo@gmail.com'"
+docker compose exec db psql -U youcare -d youcare -c "INSERT INTO empresa (id, razon_social, cif) SELECT id, 'Cuida Granada SL', 'B18000001' FROM usuario WHERE email = 'info@cuidagranada.com'"
+```
+
+**Esperado:** `INSERT 0 3` y después `INSERT 0 1` tres veces.
+
+![Datos de prueba](imgsReadme/bd-39-datos-v12-v15.png)
+
+---
+
+## 11. V12 — Chat
+
+### 11.1 Estructura de `chat`
+
+```bash
+docker compose exec db psql -U youcare -d youcare -c "\d chat"
+```
+
+**Esperado:**
+- `cliente_id` con `not null`. `cuidador_id`, `empresa_id` y `fecha_ultimo_mensaje` admiten `null`.
+- `fecha_creacion` con default `now()`.
+- Restricciones `ck_chat_un_proveedor`, `uk_chat_cliente_cuidador` y `uk_chat_cliente_empresa`.
+- Tres FK con `ON DELETE CASCADE`: `fk_chat_cliente`, `fk_chat_cuidador` y `fk_chat_empresa`.
+- Referenciada por `mensaje`.
+
+![Tabla chat](imgsReadme/bd-40-chat.png)
+
+### 11.2 Chat con cuidador y chat con empresa → se insertan
+
+```bash
+docker compose exec db psql -U youcare -d youcare -c "INSERT INTO chat (cliente_id, cuidador_id) VALUES ((SELECT id FROM usuario WHERE email = 'rosa@gmail.com'), (SELECT id FROM usuario WHERE email = 'pablo@gmail.com'))"
+docker compose exec db psql -U youcare -d youcare -c "INSERT INTO chat (cliente_id, empresa_id) VALUES ((SELECT id FROM usuario WHERE email = 'rosa@gmail.com'), (SELECT id FROM usuario WHERE email = 'info@cuidagranada.com'))"
+docker compose exec db psql -U youcare -d youcare -c "SELECT c.id, u.email AS cliente, c.cuidador_id IS NOT NULL AS con_cuidador, c.empresa_id IS NOT NULL AS con_empresa FROM chat c JOIN usuario u ON u.id = c.cliente_id ORDER BY c.id"
+```
+
+**Esperado:** dos filas de `rosa@gmail.com`, una con `con_cuidador = t` y otra con `con_empresa = t`. Nunca las dos a la vez.
+
+![Chats insertados](imgsReadme/bd-41-chat-insert.png)
+
+### 11.3 Chat con los dos proveedores → rechazado
+
+```bash
+docker compose exec db psql -U youcare -d youcare -c "INSERT INTO chat (cliente_id, cuidador_id, empresa_id) VALUES ((SELECT id FROM usuario WHERE email = 'rosa@gmail.com'), (SELECT id FROM usuario WHERE email = 'pablo@gmail.com'), (SELECT id FROM usuario WHERE email = 'info@cuidagranada.com'))"
+```
+
+**Esperado:** `violates check constraint "ck_chat_un_proveedor"`
+
+![Dos proveedores](imgsReadme/bd-42-check-chat-dos-proveedores.png)
+
+### 11.4 Chat sin proveedor → rechazado
+
+```bash
+docker compose exec db psql -U youcare -d youcare -c "INSERT INTO chat (cliente_id) VALUES ((SELECT id FROM usuario WHERE email = 'rosa@gmail.com'))"
+```
+
+**Esperado:** `violates check constraint "ck_chat_un_proveedor"`
+
+![Sin proveedor](imgsReadme/bd-43-check-chat-sin-proveedor.png)
+
+### 11.5 Chat repetido → rechazado
+
+```bash
+docker compose exec db psql -U youcare -d youcare -c "INSERT INTO chat (cliente_id, cuidador_id) VALUES ((SELECT id FROM usuario WHERE email = 'rosa@gmail.com'), (SELECT id FROM usuario WHERE email = 'pablo@gmail.com'))"
+docker compose exec db psql -U youcare -d youcare -c "INSERT INTO chat (cliente_id, empresa_id) VALUES ((SELECT id FROM usuario WHERE email = 'rosa@gmail.com'), (SELECT id FROM usuario WHERE email = 'info@cuidagranada.com'))"
+```
+
+**Esperado:** `uk_chat_cliente_cuidador` en el primero y `uk_chat_cliente_empresa` en el segundo. Un solo chat por pareja.
+
+![Chat repetido](imgsReadme/bd-44-unique-chat.png)
+
+---
+
+## 12. V13 — Mensaje
+
+### 12.1 Estructura de `mensaje`
+
+```bash
+docker compose exec db psql -U youcare -d youcare -c "\d mensaje"
+```
+
+**Esperado:**
+- `contenido varchar(2000)` con `not null`. `fecha_lectura` admite `null`.
+- Restricciones `ck_mensaje_contenido` y `ck_mensaje_fecha_lectura`.
+- FK `fk_mensaje_chat` y `fk_mensaje_emisor`, las dos con `ON DELETE CASCADE`.
+- Índices `idx_mensaje_chat_fecha` (`chat_id, fecha_envio`) e `idx_mensaje_emisor`.
+- Sin columna de receptor: es el otro participante del chat.
+
+![Tabla mensaje](imgsReadme/bd-45-mensaje.png)
+
+### 12.2 Conversación entre cliente y cuidador → se inserta
+
+```bash
+docker compose exec db psql -U youcare -d youcare -c "INSERT INTO mensaje (chat_id, emisor_id, contenido) VALUES ((SELECT id FROM chat WHERE cuidador_id = (SELECT id FROM usuario WHERE email = 'pablo@gmail.com')), (SELECT id FROM usuario WHERE email = 'rosa@gmail.com'), 'Hola, ¿tienes disponibilidad el lunes?'), ((SELECT id FROM chat WHERE cuidador_id = (SELECT id FROM usuario WHERE email = 'pablo@gmail.com')), (SELECT id FROM usuario WHERE email = 'pablo@gmail.com'), 'Sí, por la mañana')"
+docker compose exec db psql -U youcare -d youcare -c "SELECT u.email AS emisor, m.contenido, m.fecha_lectura FROM mensaje m JOIN usuario u ON u.id = m.emisor_id ORDER BY m.id"
+```
+
+**Esperado:** `INSERT 0 2`. Dos filas, una de Rosa y otra de Pablo, con `fecha_lectura` vacía porque todavía no se han leído.
+
+![Mensajes insertados](imgsReadme/bd-46-mensaje-insert.png)
+
+### 12.3 Mensaje marcado como leído
+
+```bash
+docker compose exec db psql -U youcare -d youcare -c "UPDATE mensaje SET fecha_lectura = now() WHERE emisor_id = (SELECT id FROM usuario WHERE email = 'pablo@gmail.com')"
+docker compose exec db psql -U youcare -d youcare -c "SELECT u.email AS emisor, m.fecha_lectura IS NOT NULL AS leido FROM mensaje m JOIN usuario u ON u.id = m.emisor_id ORDER BY m.id"
+```
+
+**Esperado:** `UPDATE 1`. El mensaje de Pablo aparece con `leido = t` y el de Rosa con `leido = f`.
+
+![Mensaje leído](imgsReadme/bd-47-mensaje-leido.png)
+
+### 12.4 Mensaje vacío → rechazado
+
+```bash
+docker compose exec db psql -U youcare -d youcare -c "INSERT INTO mensaje (chat_id, emisor_id, contenido) VALUES ((SELECT id FROM chat WHERE cuidador_id = (SELECT id FROM usuario WHERE email = 'pablo@gmail.com')), (SELECT id FROM usuario WHERE email = 'rosa@gmail.com'), '   ')"
+```
+
+**Esperado:** `violates check constraint "ck_mensaje_contenido"`
+
+![Mensaje vacío](imgsReadme/bd-48-check-mensaje-contenido.png)
+
+### 12.5 Leído antes de enviarse → rechazado
+
+```bash
+docker compose exec db psql -U youcare -d youcare -c "INSERT INTO mensaje (chat_id, emisor_id, contenido, fecha_envio, fecha_lectura) VALUES ((SELECT id FROM chat WHERE cuidador_id = (SELECT id FROM usuario WHERE email = 'pablo@gmail.com')), (SELECT id FROM usuario WHERE email = 'rosa@gmail.com'), 'x', now(), now() - interval '1 hour')"
+```
+
+**Esperado:** `violates check constraint "ck_mensaje_fecha_lectura"`
+
+![Fecha de lectura](imgsReadme/bd-49-check-mensaje-fecha-lectura.png)
+
+### 12.6 Más de 2000 caracteres → rechazado
+
+```bash
+docker compose exec db psql -U youcare -d youcare -c "INSERT INTO mensaje (chat_id, emisor_id, contenido) VALUES ((SELECT id FROM chat WHERE cuidador_id = (SELECT id FROM usuario WHERE email = 'pablo@gmail.com')), (SELECT id FROM usuario WHERE email = 'rosa@gmail.com'), repeat('x', 2001))"
+```
+
+**Esperado:** `value too long for type character varying(2000)`
+
+![Mensaje largo](imgsReadme/bd-50-mensaje-largo.png)
+
+### 12.7 Mensaje en un chat que no existe → rechazado
+
+```bash
+docker compose exec db psql -U youcare -d youcare -c "INSERT INTO mensaje (chat_id, emisor_id, contenido) VALUES (999999, (SELECT id FROM usuario WHERE email = 'rosa@gmail.com'), 'Hola')"
+```
+
+**Esperado:** `violates foreign key constraint "fk_mensaje_chat"`
+
+![FK mensaje](imgsReadme/bd-51-fk-mensaje-chat.png)
+
+---
+
+## 13. V14 — Refresh token
+
+### 13.1 Estructura de `refresh_token`
+
+```bash
+docker compose exec db psql -U youcare -d youcare -c "\d refresh_token"
+```
+
+**Esperado:**
+- `hash_token varchar(64)` con `not null`. `fecha_revocacion` admite `null`.
+- Restricciones `uk_refresh_token_hash`, `ck_refresh_token_hash` y `ck_refresh_token_fechas`.
+- FK `fk_refresh_token_usuario` con `ON DELETE CASCADE` e índice `idx_refresh_token_usuario`.
+- No hay columna con el token: solo su hash SHA-256.
+
+![Tabla refresh_token](imgsReadme/bd-52-refresh-token.png)
+
+### 13.2 Token válido → se inserta
+
+```bash
+docker compose exec db psql -U youcare -d youcare -c "INSERT INTO refresh_token (usuario_id, hash_token, fecha_expiracion) VALUES ((SELECT id FROM usuario WHERE email = 'rosa@gmail.com'), repeat('a', 64), now() + interval '7 days')"
+docker compose exec db psql -U youcare -d youcare -c "SELECT fecha_expiracion - fecha_creacion AS validez, fecha_revocacion IS NULL AND fecha_expiracion > now() AS activo FROM refresh_token"
+```
+
+**Esperado:** `validez = 7 days` y `activo = t`.
+
+![Refresh token insertado](imgsReadme/bd-53-refresh-insert.png)
+
+### 13.3 Hash repetido → rechazado
+
+```bash
+docker compose exec db psql -U youcare -d youcare -c "INSERT INTO refresh_token (usuario_id, hash_token, fecha_expiracion) VALUES ((SELECT id FROM usuario WHERE email = 'rosa@gmail.com'), repeat('a', 64), now() + interval '7 days')"
+```
+
+**Esperado:** `violates unique constraint "uk_refresh_token_hash"`
+
+![Hash repetido](imgsReadme/bd-54-unique-refresh-hash.png)
+
+### 13.4 Hash con formato inválido → rechazado
+
+En mayúsculas y con 63 caracteres:
+
+```bash
+docker compose exec db psql -U youcare -d youcare -c "INSERT INTO refresh_token (usuario_id, hash_token, fecha_expiracion) VALUES ((SELECT id FROM usuario WHERE email = 'rosa@gmail.com'), repeat('A', 64), now() + interval '7 days')"
+docker compose exec db psql -U youcare -d youcare -c "INSERT INTO refresh_token (usuario_id, hash_token, fecha_expiracion) VALUES ((SELECT id FROM usuario WHERE email = 'rosa@gmail.com'), repeat('b', 63), now() + interval '7 days')"
+```
+
+**Esperado:** `violates check constraint "ck_refresh_token_hash"` en los dos.
+
+![Hash inválido](imgsReadme/bd-55-check-refresh-hash.png)
+
+### 13.5 Caduca antes de crearse → rechazado
+
+```bash
+docker compose exec db psql -U youcare -d youcare -c "INSERT INTO refresh_token (usuario_id, hash_token, fecha_expiracion) VALUES ((SELECT id FROM usuario WHERE email = 'rosa@gmail.com'), repeat('b', 64), now() - interval '1 hour')"
+```
+
+**Esperado:** `violates check constraint "ck_refresh_token_fechas"`
+
+![Fechas inválidas](imgsReadme/bd-56-check-refresh-fechas.png)
+
+### 13.6 Revocar el token (logout)
+
+```bash
+docker compose exec db psql -U youcare -d youcare -c "UPDATE refresh_token SET fecha_revocacion = now() WHERE usuario_id = (SELECT id FROM usuario WHERE email = 'rosa@gmail.com')"
+docker compose exec db psql -U youcare -d youcare -c "SELECT fecha_revocacion IS NULL AND fecha_expiracion > now() AS activo FROM refresh_token"
+```
+
+**Esperado:** `UPDATE 1` y `activo = f`.
+
+![Token revocado](imgsReadme/bd-57-refresh-revocado.png)
+
+---
+
+## 14. V15 — Email token
+
+### 14.1 Estructura de `email_token`
+
+```bash
+docker compose exec db psql -U youcare -d youcare -c "\d email_token"
+```
+
+**Esperado:**
+- `hash_token varchar(64)` y `tipo varchar(20)`, los dos con `not null`. `fecha_uso` admite `null`.
+- Restricciones `uk_email_token_hash`, `ck_email_token_hash`, `ck_email_token_tipo` y `ck_email_token_fechas`.
+- FK `fk_email_token_usuario` con `ON DELETE CASCADE` e índice `idx_email_token_usuario_tipo`.
+
+![Tabla email_token](imgsReadme/bd-58-email-token.png)
+
+### 14.2 Token de verificación y de recuperación → se insertan
+
+```bash
+docker compose exec db psql -U youcare -d youcare -c "INSERT INTO email_token (usuario_id, hash_token, tipo, fecha_expiracion) VALUES ((SELECT id FROM usuario WHERE email = 'rosa@gmail.com'), repeat('c', 64), 'VERIFICACION', now() + interval '24 hours'), ((SELECT id FROM usuario WHERE email = 'rosa@gmail.com'), repeat('d', 64), 'RECUPERACION', now() + interval '1 hour')"
+docker compose exec db psql -U youcare -d youcare -c "SELECT tipo, fecha_expiracion - fecha_creacion AS validez, fecha_uso IS NULL AS sin_usar FROM email_token ORDER BY id"
+```
+
+**Esperado:** `VERIFICACION` con `1 day` y `RECUPERACION` con `01:00:00`, los dos con `sin_usar = t`.
+
+![Email tokens insertados](imgsReadme/bd-59-email-token-insert.png)
+
+### 14.3 Tipo inválido → rechazado
+
+```bash
+docker compose exec db psql -U youcare -d youcare -c "INSERT INTO email_token (usuario_id, hash_token, tipo, fecha_expiracion) VALUES ((SELECT id FROM usuario WHERE email = 'rosa@gmail.com'), repeat('e', 64), 'OTRO', now() + interval '1 hour')"
+```
+
+**Esperado:** `violates check constraint "ck_email_token_tipo"`
+
+![Tipo inválido](imgsReadme/bd-60-check-email-token-tipo.png)
+
+### 14.4 Usar el token de verificación
+
+```bash
+docker compose exec db psql -U youcare -d youcare -c "UPDATE email_token SET fecha_uso = now() WHERE tipo = 'VERIFICACION'"
+docker compose exec db psql -U youcare -d youcare -c "SELECT tipo, fecha_uso IS NULL AS sin_usar FROM email_token ORDER BY id"
+```
+
+**Esperado:** `UPDATE 1`. `VERIFICACION` aparece con `sin_usar = f` y `RECUPERACION` sigue con `t`. Que no se pueda usar dos veces lo controla `EmailToken.marcarUsado()` en Java: lo comprueban los tests del apartado 15.2.
+
+![Token usado](imgsReadme/bd-61-email-token-usado.png)
+
+### 14.5 Borrado en cascada
+
+Al borrar el cliente desaparecen sus chats, los mensajes de esos chats y sus tokens:
+
+```bash
+docker compose exec db psql -U youcare -d youcare -c "DELETE FROM usuario WHERE email = 'rosa@gmail.com'"
+docker compose exec db psql -U youcare -d youcare -c "SELECT (SELECT count(*) FROM chat) AS chats, (SELECT count(*) FROM mensaje) AS mensajes, (SELECT count(*) FROM refresh_token) AS refresh, (SELECT count(*) FROM email_token) AS email"
+docker compose exec db psql -U youcare -d youcare -c "DELETE FROM usuario WHERE email IN ('pablo@gmail.com', 'info@cuidagranada.com')"
+```
+
+**Esperado:** `DELETE 1`, después `0 | 0 | 0 | 0` y por último `DELETE 2`.
+
+![Cascada V12–V15](imgsReadme/bd-62-cascade-chat-tokens.png)
+
+---
+
+## 15. Comprobación rápida y tests
+
+### 15.1 Script con todas las restricciones de V12–V15
+
+Hace en una sola ejecución lo mismo que los apartados 11–14, con ids 9001–9003, y se limpia al final. **Desde `backend/`:**
+
+```bash
+docker compose exec -T db psql -U youcare -d youcare < scripts/pruebas/prueba_chat_tokens.sql
+```
+
+**Esperado:** cada sentencia da `INSERT 0 1` o un `ERROR` con su restricción, en el orden de los comentarios del archivo. La última fila es `0 | 0 | 0 | 0`.
+
+![Script de pruebas](imgsReadme/bd-63-script-chat-tokens.png)
+
+### 15.2 Tests unitarios
+
+**Desde `backend/`, con la BD levantada** (`BackendApplicationTests` arranca la app contra ella):
+
+```bash
+./mvnw test
+```
+
+**Esperado:** `Tests run: 98, Failures: 0, Errors: 0, Skipped: 0` y `BUILD SUCCESS`.
+
+| Clase | Tests |
+|---|---|
+| `CuidadorTest` | 23 |
+| `EmpresaTest` | 8 |
+| `DocumentoTest` | 6 |
+| `FranjaHorariaTest` | 7 |
+| `ChatTest` | 16 |
+| `MensajeTest` | 15 |
+| `RefreshTokenTest` | 11 |
+| `EmailTokenTest` | 11 |
+| `BackendApplicationTests` | 1 |
+
+Para ejecutar solo los de esta rama:
+
+```bash
+./mvnw test -Dtest='ChatTest,MensajeTest,RefreshTokenTest,EmailTokenTest'
+```
+
+**Esperado:** `Tests run: 53`.
+
+![Tests unitarios](imgsReadme/bd-64-tests.png)
+
+## 16. Limpiar los datos de prueba
 
 ```bash
 docker compose exec db psql -U youcare -d youcare -c "DELETE FROM usuario"
@@ -585,7 +927,7 @@ Por el `ON DELETE CASCADE`, también se vacían `cliente`, `admin`, `empresa`, `
 
 ---
 
-## 11. Consola interactiva (opcional)
+## 17. Consola interactiva (opcional)
 
 ```bash
 docker compose exec db psql -U youcare -d youcare
