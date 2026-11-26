@@ -92,7 +92,7 @@ public class EmailToken {
         };
     }
 
-    // ============= LÓGICA =============
+    // ============= LOGICA =============
 
     /** @return {@code true} si no se ha usado ni ha caducado */
     public boolean esValido(Instant ahora) {

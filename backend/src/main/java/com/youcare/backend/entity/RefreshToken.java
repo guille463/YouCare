@@ -79,7 +79,7 @@ public class RefreshToken {
         this.fechaExpiracion = fechaCreacion.plus(Config.DIAS_VALIDEZ_REFRESH_TOKEN, ChronoUnit.DAYS);
     }
 
-    // ============= LÓGICA =============
+    // ============= LOGICA =============
 
     /** @return {@code true} si no esta revocado ni caducado */
     public boolean estaActivo(Instant ahora) {

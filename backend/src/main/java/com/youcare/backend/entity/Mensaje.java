@@ -83,7 +83,7 @@ public class Mensaje {
         this.fechaEnvio = Instant.now();
     }
 
-    // ============= LÓGICA =============
+    // ============= LOGICA =============
 
     /** Marca el mensaje como leído. Si ya lo estaba, conserva la primera fecha. */
     public void marcarLeido() {

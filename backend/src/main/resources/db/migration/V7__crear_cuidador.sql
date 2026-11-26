@@ -12,7 +12,7 @@ CREATE TABLE cuidador (
     CONSTRAINT ck_cuidador_dni_nie CHECK (dni_nie ~ '^([0-9]{8}|[XYZ][0-9]{7})[TRWAGMYFPDXBNJZSQVHLCKE]$'),
     CONSTRAINT ck_cuidador_estado_verificacion CHECK (estado_verificacion IN ('SIN_SUBIR','PENDIENTE', 'VERIFICADO', 'RECHAZADO')),
     CONSTRAINT ck_cuidador_estado_en_empresa CHECK (estado_en_empresa IN ('PENDIENTE', 'ACTIVO', 'BAJA')),
-    -- Autónomo: sin empresa y sin estado. Con empresa: siempre con estado.
+    -- Autonomo: sin empresa y sin estado. Con empresa: siempre con estado.
     CONSTRAINT ck_cuidador_empresa_y_estado CHECK ((empresa_id IS NULL) = (estado_en_empresa IS NULL))
 );
 

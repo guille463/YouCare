@@ -8,7 +8,7 @@ CREATE TABLE refresh_token (
 
     CONSTRAINT fk_refresh_token_usuario FOREIGN KEY (usuario_id) REFERENCES usuario (id) ON DELETE CASCADE,
     CONSTRAINT uk_refresh_token_hash UNIQUE (hash_token),
-    -- SHA-256 en hexadecimal en minúsculas
+    -- SHA-256 en hexadecimal en minusculas
     CONSTRAINT ck_refresh_token_hash CHECK (hash_token ~ '^[0-9a-f]{64}$'),
     CONSTRAINT ck_refresh_token_fechas CHECK (fecha_expiracion > fecha_creacion)
 );

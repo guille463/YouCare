@@ -58,7 +58,7 @@ public class Cliente extends Usuario {
         this.fechaNacimiento = fechaNacimiento;
     }
 
-    // ============= GETTERS & SETTERS =============
+    // ============= GETTERS-SETTERS =============
 
     /** @return fecha de nacimiento */
     public LocalDate getFechaNacimiento() {

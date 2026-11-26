@@ -81,7 +81,7 @@ public class Empresa extends Usuario {
         this.estadoVerificacion = EstadoVerificacion.SIN_SUBIR;
     }
 
-    // ============= GETTERS & SETTERS =============
+    // ============= GETTERS-SETTERS =============
 
     /** @return razón social */
     public String getRazonSocial() {

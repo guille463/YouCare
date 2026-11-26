@@ -96,7 +96,7 @@ public class Cuidador extends Usuario {
         this.estadoVerificacion = EstadoVerificacion.SIN_SUBIR;
     }
 
-    // ============= GETTERS & SETTERS =============
+    // ============= GETTERS-SETTERS =============
 
     /** @return DNI o NIE */
     public String getDniNie() {
